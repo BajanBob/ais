@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIS Station</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+:root{--bg:#06101a;--panel:#0c1824;--panel2:#10202f;--line:#1c3246;--ink:#d8e6f2;--dim:#7f97ad;
+  --a:#33d6ff;--b:#ffb020;--base:#e8eef5;--aton:#e05cff;--ok:#2ee6a6;--bad:#ff4d5e;--mono:ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding:10px 16px;border-bottom:1px solid var(--line);background:#081420}
+header h1{margin:0;font-size:17px;letter-spacing:.14em}
+header h1 small{display:block;font-size:10px;color:var(--dim);letter-spacing:.2em;font-weight:500}
+.stat{font-size:11px;color:var(--dim)}.stat b{display:block;font:700 18px var(--mono);color:var(--ink)}
+.demo{background:#5a8cff;color:#fff;font-size:10px;padding:2px 8px;border-radius:99px;letter-spacing:.12em}
+.layout{display:grid;grid-template-columns:1fr 430px;height:calc(100% - 62px)}
+@media (max-width:1000px){.layout{grid-template-columns:1fr;height:auto}#map{height:60vh}}
+.layout>div,aside{min-width:0}
+#map,#radar{height:100%;width:100%;min-height:380px;background:#0a1825}
+.rx .small{overflow-wrap:anywhere}
+#radar{display:none}
+aside{overflow:auto;border-left:1px solid var(--line);padding:10px;display:grid;gap:10px;align-content:start}
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;padding:10px}
+.card h2{margin:0 0 8px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);display:flex;gap:8px;align-items:center}
+.card h2 span{flex:1}
+.rx{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:#0a1622}
+.rx .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rx b{font-size:13px}
+.led{display:inline-block;width:9px;height:9px;border-radius:50%;background:#3a4a5a;margin-right:6px}
+.led.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}.led.err{background:var(--bad)}
+.meter{height:7px;border-radius:4px;background:#13283a;overflow:hidden;margin:6px 0 4px}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,#2ee6a6,#ffd34d 75%,#ff4d5e);transition:width .3s}
+.seg{display:flex;gap:4px}
+.seg button{font:inherit;font-size:11px;color:var(--ink);background:#10202f;border:1px solid var(--line);border-radius:7px;padding:2px 9px;cursor:pointer}
+.seg button.on{border-color:var(--a);color:var(--a)}
+.small{font-size:11px;color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-size:10px;color:var(--dim);font-weight:500;letter-spacing:.08em;text-transform:uppercase;padding:4px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+td{padding:4px;border-bottom:1px solid #12263a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+tr{cursor:pointer}tr:hover td{background:#12263a}tr.sel td{background:#173350}
+.scroll{max-height:330px;overflow:auto}
+.dotc{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}.kv dt{color:var(--dim)}.kv dd{margin:0;font-family:var(--mono)}
+.log{font:11px/1.5 var(--mono);color:#9fb6cb;max-height:170px;overflow:auto;white-space:pre}
+input.search{background:#0a1622;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:3px 7px;font-size:11px;width:120px}
+.leaflet-container{background:#0a1825}
+.ship{transition:transform .4s}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">AIS STATION<small>RECEIVE-ONLY · VHF 161.975 / 162.025 MHz</small></h1>
+  <div class="stat">Vessels<b id="sVessels">0</b></div>
+  <div class="stat">Messages/min<b id="sRate">0</b></div>
+  <div class="stat">Total messages<b id="sTotal">0</b></div>
+  <div class="stat">Best range<b id="sRange">–</b></div>
+  <div class="stat">Uptime<b id="sUp">–</b></div>
+  <span id="demoTag"></span>
+</header>
+<div class="layout">
+  <div><div id="map"></div><svg id="radar" viewBox="-110 -110 220 220"></svg></div>
+  <aside>
+    <div class="card"><h2><span>Receivers</span></h2><div id="rxs"></div><div class="small" id="outs"></div></div>
+    <div class="card"><h2><span>Selected vessel</span></h2><div id="detail" class="small">Click a ship on the map or in the list.</div></div>
+    <div class="card"><h2><span>Vessels</span><input class="search" id="q" placeholder="Name, MMSI…"></h2>
+      <div class="scroll"><table><thead><tr><th>Name / MMSI</th><th>Type</th><th>Kn</th><th>Range</th><th>Seen</th></tr></thead><tbody id="list"></tbody></table></div></div>
+    <div class="card"><h2><span>Live NMEA</span></h2><div class="log" id="log"></div></div>
+  </aside>
+</div>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ago = t => { if (!t) return "–"; const s = Math.max(0, Date.now()/1000 - t); return s < 60 ? Math.round(s)+"s" : s < 3600 ? Math.round(s/60)+"m" : Math.round(s/3600)+"h"; };
+const COLOR = {A:"#33d6ff", B:"#ffb020", "Base station":"#e8eef5", AtoN:"#e05cff"};
+const color = v => COLOR[v.cls] || "#9fb6cb";
+let selected = null, last = null, map = null, layer = null, markers = {}, stationMarker = null, centred = false;
+
+function shipSvg(v) {
+  const c = color(v);
+  if (v.cls === "Base station") return `<svg width="16" height="16" viewBox="-8 -8 16 16"><rect x="-5" y="-5" width="10" height="10" fill="${c}" stroke="#000" stroke-width="1"/></svg>`;
+  if (v.cls === "AtoN") return `<svg width="16" height="16" viewBox="-8 -8 16 16"><path d="M0-7 7 0 0 7-7 0Z" fill="${c}" stroke="#000"/></svg>`;
+  const rot = v.heading ?? v.cog ?? 0, moving = (v.sog || 0) > 0.5;
+  return `<svg width="26" height="26" viewBox="-13 -13 26 26" style="transform:rotate(${rot}deg)">
+    ${moving ? `<line x1="0" y1="-7" x2="0" y2="-13" stroke="${c}" stroke-width="1.5"/>` : ""}
+    <path d="M0-8 5 7 0 4-5 7Z" fill="${c}" stroke="#001" stroke-width="1"/></svg>`;
+}
+
+function initMap(st) {
+  if (typeof L === "undefined") { $("#map").style.display = "none"; $("#radar").style.display = "block"; return; }
+  map = L.map("map", {zoomControl: true, attributionControl: true}).setView([st.lat ?? 13.1, st.lon ?? -59.6], 10);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 17,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  layer = L.layerGroup().addTo(map);
+  if (st.lat != null) {
+    stationMarker = L.circleMarker([st.lat, st.lon], {radius: 7, color: "#2ee6a6", fillColor: "#2ee6a6", fillOpacity: .9})
+      .addTo(map).bindTooltip(esc(st.name));
+    [10, 20, 40].forEach(nm => L.circle([st.lat, st.lon], {radius: nm * 1852, color: "#2ee6a6", weight: 1, opacity: .25, fill: false, dashArray: "4 6"}).addTo(map));
+  }
+}
+
+function drawMap(s) {
+  const seen = new Set();
+  for (const v of s.vessels) {
+    if (v.lat == null) continue;
+    seen.add(v.mmsi);
+    const icon = L.divIcon({html: shipSvg(v), className: "", iconSize: [26, 26], iconAnchor: [13, 13]});
+    let m = markers[v.mmsi];
+    const label = esc(v.name || v.mmsi);
+    if (!m) {
+      m = markers[v.mmsi] = {mk: L.marker([v.lat, v.lon], {icon}).addTo(layer), tr: L.polyline([], {color: color(v), weight: 1.5, opacity: .5}).addTo(layer)};
+      m.mk.on("click", () => select(v.mmsi));
+    } else { m.mk.setLatLng([v.lat, v.lon]); m.mk.setIcon(icon); }
+    m.mk.bindTooltip(label, {direction: "top", offset: [0, -10]});
+    m.tr.setLatLngs(v.track || []);
+  }
+  for (const k of Object.keys(markers)) if (!seen.has(+k)) { layer.removeLayer(markers[k].mk); layer.removeLayer(markers[k].tr); delete markers[k]; }
+}
+
+function drawRadar(s) {  // offline fallback: plot by range and bearing
+  const R = Math.max(10, ...s.vessels.map(v => v.range_nm || 0)) * 1.1;
+  let g = [10, 25, 50, 100].filter(r => r < R * 1.2).map(r => `<circle r="${100 * r / R}" fill="none" stroke="#1f4a3a" stroke-dasharray="2 3"/><text x="${100 * r / R + 2}" y="-2" fill="#3f7a64" font-size="5">${r} nm</text>`).join("");
+  g += `<line x1="-100" y1="0" x2="100" y2="0" stroke="#163428"/><line x1="0" y1="-100" x2="0" y2="100" stroke="#163428"/><circle r="2.5" fill="#2ee6a6"/>`;
+  for (const v of s.vessels) if (v.range_nm != null) {
+    const a = (v.bearing - 90) * Math.PI / 180, r = 100 * v.range_nm / R;
+    g += `<g transform="translate(${r * Math.cos(a)},${r * Math.sin(a)})" onclick="select(${v.mmsi})" style="cursor:pointer"><circle r="2.6" fill="${color(v)}"/><text x="4" y="1.5" fill="#cfe" font-size="4.5">${esc(v.name || v.mmsi)}</text></g>`;
+  }
+  $("#radar").innerHTML = g + `<text x="-106" y="-100" fill="#7f97ad" font-size="5">Offline view: range & bearing from station (map tiles need internet)</text>`;
+}
+
+function select(mmsi) {
+  selected = mmsi; render(last);
+  const v = last.vessels.find(x => x.mmsi === mmsi);
+  if (map && v && v.lat != null) map.panTo([v.lat, v.lon]);
+}
+window.select = select;
+
+function render(s) {
+  if (!s) return;
+  $("#title").innerHTML = `${esc(s.station.name)}<small>RECEIVE-ONLY · VHF AIS 161.975 / 162.025 MHz</small>`;
+  $("#sVessels").textContent = s.vessels.length;
+  $("#sRate").textContent = s.stats.per_min;
+  $("#sTotal").textContent = s.stats.messages;
+  $("#sRange").textContent = s.stats.max_range_nm ? s.stats.max_range_nm + " nm" : "–";
+  const u = s.stats.uptime; $("#sUp").textContent = `${Math.floor(u / 3600)}h ${Math.floor(u / 60) % 60}m`;
+  $("#demoTag").innerHTML = s.demo ? `<span class="demo">DEMO · SIMULATED SHIPS</span>` : "";
+
+  $("#rxs").innerHTML = s.receivers.map(r => {
+    const live = r.last_frame && Date.now() / 1000 - r.last_frame < 120, pct = Math.max(0, Math.min(100, (r.level_db + 60) / 60 * 100));
+    return `<div class="rx"><div class="top"><div><span class="led ${r.cat_ok ? (live ? "on" : "") : "err"}"></span><b>${esc(r.name)}</b>
+      <span class="small"> · ${r.channel === "A" ? "AIS 1 (87B)" : "AIS 2 (88B)"} ${r.mhz.toFixed(3)} MHz</span></div>
+      <div class="seg">${["A", "B", "SCAN"].map(m => `<button class="${r.mode === m ? "on" : ""}" onclick="setCh('${esc(r.name)}','${m}')">${m === "SCAN" ? "Scan" : m}</button>`).join("")}</div></div>
+      <div class="meter"><i style="width:${pct}%"></i></div>
+      <div class="small">Audio ${r.level_db} dBFS · ${r.frames} decoded · last ${ago(r.last_frame)} ago · ${esc(r.rig.toUpperCase())}: ${esc(r.rig_status)}</div></div>`;
+  }).join("") + (s.inputs.length ? `<div class="small">Also receiving NMEA from: ${s.inputs.map(esc).join(", ")}</div>` : "");
+  $("#outs").textContent = `NMEA out → UDP ${s.outputs.udp.join(", ") || "off"} · TCP ${s.outputs.tcp || "off"}`;
+
+  const q = $("#q").value.trim().toLowerCase();
+  const rows = s.vessels.filter(v => !q || `${v.name || ""} ${v.mmsi} ${v.callsign || ""}`.toLowerCase().includes(q));
+  $("#list").innerHTML = rows.map(v => `<tr class="${v.mmsi === selected ? "sel" : ""}" onclick="select(${v.mmsi})">
+    <td><span class="dotc" style="background:${color(v)}"></span>${esc(v.name || v.mmsi)}</td><td>${esc(v.shiptype_name || v.aid_type || v.cls || "")}</td>
+    <td>${v.sog ?? ""}</td><td>${v.range_nm != null ? v.range_nm + " nm" : ""}</td><td>${ago(v.last)}</td></tr>`).join("") ||
+    `<tr><td colspan="5" class="small">No vessels yet. Check the audio meter moves when the channel is busy.</td></tr>`;
+
+  const v = s.vessels.find(x => x.mmsi === selected);
+  $("#detail").innerHTML = v ? `<dl class="kv">${[
+      ["Name", v.name], ["MMSI", v.mmsi], ["Call sign", v.callsign], ["IMO", v.imo], ["Class", v.cls], ["Type", v.shiptype_name || v.aid_type],
+      ["Status", v.status], ["Position", v.lat != null ? `${v.lat.toFixed(5)}, ${v.lon.toFixed(5)}` : null],
+      ["Speed / course", v.sog != null ? `${v.sog} kn / ${v.cog ?? "–"}°` : null], ["Heading", v.heading != null ? v.heading + "°" : null],
+      ["Range / bearing", v.range_nm != null ? `${v.range_nm} nm / ${v.bearing}°` : null], ["Destination", v.destination], ["ETA", v.eta],
+      ["Size", v.length ? `${v.length} × ${v.beam || "?"} m, draught ${v.draught ?? "?"} m` : null],
+      ["Heard via", (v.sources || []).join(", ") + ` · ch ${v.channel}`], ["Messages", v.count], ["Last heard", ago(v.last) + " ago"]]
+    .filter(([, x]) => x != null && x !== "").map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join("")}</dl>` : "Click a ship on the map or in the list.";
+
+  $("#log").textContent = s.log.slice().reverse().map(l => `${new Date(l.t * 1000).toLocaleTimeString()} ${l.nmea}`).join("\n");
+  if (map) drawMap(s); else drawRadar(s);
+}
+
+async function setCh(rx, mode) {
+  await fetch("/api/channel", {method: "POST", headers: {"X-AIS": "1", "Content-Type": "application/json"}, body: JSON.stringify({rx, mode})});
+  poll();
+}
+window.setCh = setCh;
+$("#q").oninput = () => render(last);
+
+async function poll() {
+  try {
+    const s = await (await fetch("/api/state", {cache: "no-store"})).json();
+    if (!centred) { initMap(s.station); centred = true; }
+    last = s; render(s);
+  } catch (e) { $("#sUp").textContent = "offline"; }
+}
+poll(); setInterval(poll, 2000);
+</script>
+</body>
+</html>
