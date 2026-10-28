@@ -38,16 +38,28 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
         if self.path == "/api/state":
             return self._send(200, json.dumps(self.station.snapshot()).encode())
+        if self.path == "/api/settings":
+            return self._send(200, json.dumps(self.station.settings()).encode())
         self._send(404, b"{}")
+
+    def _json(self, obj, code: int = 200) -> None:
+        self._send(code, json.dumps(obj).encode())
 
     def do_POST(self) -> None:
         if not self._host_ok() or self.headers.get("X-AIS") != "1":
             return self._send(403, b"{}")
-        n = min(int(self.headers.get("Content-Length") or 0), 4096)
+        n = min(int(self.headers.get("Content-Length") or 0), 65536)
         try:
             data = json.loads(self.rfile.read(n) or b"{}")
         except ValueError:
             return self._send(400, b"{}")
+        if self.path in ("/api/settings", "/api/test_cat"):
+            try:
+                if self.path == "/api/settings":
+                    return self._json({"ok": True, "message": self.station.apply_settings(data)})
+                return self._json(self.station.test_cat(data))
+            except Exception as e:  # noqa: BLE001
+                return self._json({"ok": False, "error": str(e)}, 400)
         if self.path == "/api/channel":
             mode = str(data.get("mode", "")).upper()
             if mode not in ("A", "B", "SCAN"):

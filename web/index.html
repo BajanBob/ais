@@ -48,6 +48,20 @@ tr{cursor:pointer}tr:hover td{background:#12263a}tr.sel td{background:#173350}
 input.search{background:#0a1622;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:3px 7px;font-size:11px;width:120px}
 .leaflet-container{background:#0a1825}
 .ship{transition:transform .4s}
+.btn{font:inherit;font-size:13px;color:var(--ink);background:#10202f;border:1px solid var(--a);border-radius:8px;padding:6px 14px;cursor:pointer}
+.btn:hover{background:#163048}.btn.go{background:#0f3a2c;border-color:var(--ok)}.btn.del{border-color:#ff4d5e;color:#ff8a96}
+#settings{display:none;position:fixed;inset:0;background:#000b;z-index:5000;overflow:auto}
+#settings .box{max-width:860px;margin:30px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+#settings h3{margin:0 0 4px;font-size:18px}#settings h4{margin:16px 0 8px;font-size:11px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 14px}
+.fld label{display:block;font-size:11px;color:var(--dim);margin-bottom:3px}
+.fld input,.fld select{width:100%;background:#0a1622;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:7px 8px;font:inherit}
+.rxcard{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#0a1622}
+.rxcard .head{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.rxcard .head input[type=text]{flex:1;min-width:160px}
+.msg{margin-top:8px;font-size:12px;padding:8px 10px;border-radius:8px;display:none}
+.msg.ok{display:block;background:#0f3a2c;color:#7af0c4}.msg.bad{display:block;background:#3a0d14;color:#ff8a96}
+.hint{font-size:11px;color:var(--dim);margin-top:3px}
 </style>
 </head>
 <body>
@@ -59,7 +73,26 @@ input.search{background:#0a1622;border:1px solid var(--line);color:var(--ink);bo
   <div class="stat">Best range<b id="sRange">–</b></div>
   <div class="stat">Uptime<b id="sUp">–</b></div>
   <span id="demoTag"></span>
+  <span style="flex:1"></span>
+  <button class="btn" id="openSettings">⚙ Settings</button>
 </header>
+<div id="settings"><div class="box">
+  <div style="display:flex;align-items:center;gap:10px"><h3 style="flex:1">⚙ Settings</h3>
+    <button class="btn" id="refreshLists">↻ Refresh ports &amp; audio</button><button class="btn" id="closeSettings">✕ Close</button></div>
+  <div class="hint" id="cfgPath"></div>
+  <h4>Station</h4>
+  <div class="grid2">
+    <div class="fld"><label>Station name</label><input id="sName"></div>
+    <div class="fld"><label>Latitude (e.g. 13.0975)</label><input id="sLat" inputmode="decimal"></div>
+    <div class="fld"><label>Longitude (west is negative, e.g. -59.6167)</label><input id="sLon" inputmode="decimal"></div>
+  </div>
+  <h4>Receivers</h4>
+  <div id="rxForms"></div>
+  <button class="btn" id="addRx">＋ Add receiver</button>
+  <div style="display:flex;gap:10px;margin-top:16px;align-items:center">
+    <button class="btn go" id="saveSettings">💾 Save &amp; apply</button><span class="hint">Settings are saved to config.json and the radios are retuned right away.</span></div>
+  <div class="msg" id="saveMsg"></div>
+</div></div>
 <div class="layout">
   <div><div id="map"></div><svg id="radar" viewBox="-110 -110 220 220"></svg></div>
   <aside>
@@ -154,7 +187,8 @@ function render(s) {
       <span class="small"> · ${r.channel === "A" ? "AIS 1 (87B)" : "AIS 2 (88B)"} ${r.mhz.toFixed(3)} MHz</span></div>
       <div class="seg">${["A", "B", "SCAN"].map(m => `<button class="${r.mode === m ? "on" : ""}" onclick="setCh('${esc(r.name)}','${m}')">${m === "SCAN" ? "Scan" : m}</button>`).join("")}</div></div>
       <div class="meter"><i style="width:${pct}%"></i></div>
-      <div class="small">Audio ${r.level_db} dBFS · ${r.frames} decoded · last ${ago(r.last_frame)} ago · ${esc(r.rig.toUpperCase())}: ${esc(r.rig_status)}</div></div>`;
+      <div class="small">Audio ${r.level_db} dBFS · ${r.frames} decoded · last ${ago(r.last_frame)} ago · ${esc(r.rig.toUpperCase())}: ${esc(r.rig_status)}
+      ${r.mode === "SCAN" ? ` · scanning every ${Math.round(r.scan_s / 60)} min, next switch in ${Math.floor(r.next_switch_s / 60)}:${String(r.next_switch_s % 60).padStart(2, "0")}` : ""}</div></div>`;
   }).join("") + (s.inputs.length ? `<div class="small">Also receiving NMEA from: ${s.inputs.map(esc).join(", ")}</div>` : "");
   $("#outs").textContent = `NMEA out → UDP ${s.outputs.udp.join(", ") || "off"} · TCP ${s.outputs.tcp || "off"}`;
 
@@ -185,6 +219,85 @@ async function setCh(rx, mode) {
 }
 window.setCh = setCh;
 $("#q").oninput = () => render(last);
+
+/* ---------------- settings ---------------- */
+let S = null;
+const RIGS = {icom: "Icom (CI-V) — IC-9100 etc.", yaesu: "Yaesu CAT — FT-991A etc.", kenwood: "Kenwood CAT", manual: "Manual (no CAT) — FTM-510DR etc."};
+const BAUDS = [4800, 9600, 19200, 38400, 57600, 115200];
+const DEF_BAUD = {icom: 19200, yaesu: 38400, kenwood: 9600};
+const opt = (v, label, sel) => `<option value="${esc(v)}" ${String(v) === String(sel) ? "selected" : ""}>${esc(label)}</option>`;
+
+function rxForm(r, i) {
+  const ports = S.ports.map(p => opt(p.device, `${p.device} — ${p.description}`, r.port));
+  if (r.port && !S.ports.some(p => p.device === r.port)) ports.unshift(opt(r.port, `${r.port} (not plugged in now)`, r.port));
+  const audio = S.audio.map(a => opt(a.index, `${a.index}: ${a.name}${a.api ? " (" + a.api + ")" : ""}`, r.audio_device));
+  if (r.audio_device !== undefined && r.audio_device !== "" && !S.audio.some(a => String(a.index) === String(r.audio_device)))
+    audio.unshift(opt(r.audio_device, `${r.audio_device} (name from config.json)`, r.audio_device));
+  const cat = r.rig !== "manual";
+  return `<div class="rxcard" data-i="${i}">
+    <div class="head"><label class="small"><input type="checkbox" data-k="enabled" ${r.enabled !== false ? "checked" : ""}> On</label>
+      <input type="text" class="fld" data-k="name" value="${esc(r.name || "")}" placeholder="Receiver name" style="background:#0a1622;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:7px 8px">
+      <button class="btn" data-act="test">📡 Test CAT</button><button class="btn del" data-act="remove">Remove</button></div>
+    <div class="grid2">
+      <div class="fld"><label>Radio type / control</label><select data-k="rig">${Object.entries(RIGS).map(([k, v]) => opt(k, v, r.rig || "manual")).join("")}</select></div>
+      <div class="fld" ${cat ? "" : "hidden"}><label>CAT COM port</label><select data-k="port"><option value="">— choose —</option>${ports.join("")}</select>
+        <div class="hint">FT-991A: use the “Enhanced COM Port”.</div></div>
+      <div class="fld" ${cat ? "" : "hidden"}><label>CAT baud rate (must match the radio's menu)</label><select data-k="baud">${BAUDS.map(b => opt(b, b, r.baud || DEF_BAUD[r.rig] || 19200)).join("")}</select></div>
+      <div class="fld" ${r.rig === "icom" ? "" : "hidden"}><label>Icom CI-V address</label><input data-k="civ_address" value="${esc(r.civ_address || "0x7C")}"><div class="hint">IC-9100 default: 0x7C</div></div>
+      <div class="fld"><label>Audio input (radio's 9600 data audio)</label><select data-k="audio_device"><option value="">— none —</option>${audio.join("")}</select></div>
+      <div class="fld"><label>Audio side</label><select data-k="audio_channel">${opt(0, "Left / mono", r.audio_channel || 0)}${opt(1, "Right", r.audio_channel || 0)}</select></div>
+      <div class="fld"><label>AIS channel</label><select data-k="channel">${opt("A", "A — 161.975 MHz (87B)", r.channel || "A")}${opt("B", "B — 162.025 MHz (88B)", r.channel || "A")}${opt("SCAN", "Scan A ↔ B", r.channel || "A")}</select></div>
+      <div class="fld" ${(r.channel || "A") === "SCAN" ? "" : "hidden"}><label>Switch channel every (minutes)</label>
+        <input data-k="scan_minutes" type="number" min="1" max="1440" value="${Math.round((r.scan_seconds || 600) / 60)}"></div>
+    </div>
+    <div class="msg" data-msg></div></div>`;
+}
+
+function readForms() {
+  return [...document.querySelectorAll(".rxcard")].map(card => {
+    const g = k => card.querySelector(`[data-k="${k}"]`);
+    const r = {name: g("name").value.trim(), enabled: g("enabled").checked, rig: g("rig").value, port: g("port").value,
+      baud: +g("baud").value, civ_address: g("civ_address").value.trim(), audio_device: g("audio_device").value,
+      audio_channel: +g("audio_channel").value, channel: g("channel").value, scan_seconds: Math.max(1, +g("scan_minutes").value || 10) * 60};
+    if (r.rig === "manual") { delete r.port; delete r.baud; delete r.civ_address; }
+    return r;
+  });
+}
+
+function renderSettings() {
+  $("#cfgPath").textContent = (S.demo ? "Demo mode: changes are saved for your next normal start. " : "") + (S.config_path ? "File: " + S.config_path : "");
+  $("#sName").value = S.station.name || ""; $("#sLat").value = S.station.lat ?? ""; $("#sLon").value = S.station.lon ?? "";
+  $("#rxForms").innerHTML = S.receivers.length ? S.receivers.map(rxForm).join("") : `<div class="hint">No receivers yet. Click “Add receiver”.</div>`;
+  if (!S.ports.length) $("#rxForms").insertAdjacentHTML("afterbegin", `<div class="hint" style="margin-bottom:8px">No COM ports found. Plug in the radio's USB cable and click ↻ Refresh.</div>`);
+}
+
+async function loadSettings(keepEdits) {
+  const edits = keepEdits && S ? readForms() : null;
+  S = await (await fetch("/api/settings", {cache: "no-store"})).json();
+  if (edits) S.receivers = edits;
+  renderSettings();
+}
+
+$("#openSettings").onclick = async () => { await loadSettings(false); $("#settings").style.display = "block"; $("#saveMsg").className = "msg"; };
+$("#closeSettings").onclick = () => $("#settings").style.display = "none";
+$("#refreshLists").onclick = () => loadSettings(true);
+$("#addRx").onclick = () => { S.receivers = readForms(); S.receivers.push({name: `Receiver ${S.receivers.length + 1}`, enabled: true, rig: "icom", baud: 19200, civ_address: "0x7C", channel: "A", scan_seconds: 600}); renderSettings(); };
+$("#rxForms").addEventListener("change", e => { if (["rig", "channel"].includes(e.target.dataset.k)) { S.receivers = readForms();
+  const i = +e.target.closest(".rxcard").dataset.i; if (e.target.dataset.k === "rig") S.receivers[i].baud = DEF_BAUD[S.receivers[i].rig] || 19200; renderSettings(); } });
+$("#rxForms").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const card = b.closest(".rxcard"), i = +card.dataset.i, rs = readForms(), m = card.querySelector("[data-msg]");
+  if (b.dataset.act === "remove") { rs.splice(i, 1); S.receivers = rs; renderSettings(); return; }
+  m.className = "msg ok"; m.textContent = "Testing… the radio should change frequency now.";
+  const j = await (await fetch("/api/test_cat", {method: "POST", headers: {"X-AIS": "1", "Content-Type": "application/json"}, body: JSON.stringify(rs[i])})).json();
+  m.className = "msg " + (j.ok ? "ok" : "bad"); m.textContent = j.ok ? "✓ " + j.status : "✗ " + (j.error || j.status);
+});
+$("#saveSettings").onclick = async () => {
+  const body = {station: {name: $("#sName").value, lat: $("#sLat").value, lon: $("#sLon").value}, receivers: readForms()};
+  const j = await (await fetch("/api/settings", {method: "POST", headers: {"X-AIS": "1", "Content-Type": "application/json"}, body: JSON.stringify(body)})).json();
+  $("#saveMsg").className = "msg " + (j.ok ? "ok" : "bad"); $("#saveMsg").textContent = j.ok ? "✓ " + j.message : "✗ " + j.error;
+  if (j.ok) poll();
+};
 
 async function poll() {
   try {

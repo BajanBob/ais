@@ -25,6 +25,33 @@ def list_audio_devices() -> str:
     return "Audio inputs:\n" + "\n".join(lines)
 
 
+def list_audio_inputs() -> list[dict]:
+    """Sound inputs for the settings page: [{index, name, channels, rate}]."""
+    try:
+        import sounddevice as sd
+        devs = sd.query_devices()
+        apis = sd.query_hostapis()
+    except Exception:  # noqa: BLE001
+        return []
+    out = []
+    for i, d in enumerate(devs):
+        if d["max_input_channels"] > 0:
+            api = apis[d["hostapi"]]["name"] if d.get("hostapi") is not None else ""
+            out.append({"index": i, "name": d["name"], "channels": d["max_input_channels"],
+                        "rate": int(d["default_samplerate"]), "api": api})
+    return out
+
+
+def list_serial_ports() -> list[dict]:
+    """COM ports for the settings page: [{device, description}]."""
+    try:
+        from serial.tools import list_ports
+    except ImportError:
+        return []
+    return [{"device": p.device, "description": p.description or ""}
+            for p in sorted(list_ports.comports(), key=lambda p: p.device)]
+
+
 class AudioInput:
     """Sound card / USB audio from the radio's DATA (9600) or discriminator output."""
 
@@ -33,7 +60,8 @@ class AudioInput:
         self.q: queue.Queue = queue.Queue(maxsize=200)
         self.channel = channel
         self.sink = sink
-        dev = int(device) if isinstance(device, str) and device.isdigit() else device
+        self.running = True
+        dev = int(device) if isinstance(device, (str, int)) and str(device).isdigit() else device
         info = sd.query_devices(dev, "input")
         chans = max(1, min(int(info["max_input_channels"]), channel + 1))
         self.stream = sd.InputStream(device=dev, channels=chans, samplerate=fs, blocksize=fs // 10,
@@ -48,8 +76,19 @@ class AudioInput:
             pass
 
     def _run(self) -> None:
-        while True:
-            self.sink(self.q.get())
+        while self.running:
+            try:
+                self.sink(self.q.get(timeout=0.5))
+            except queue.Empty:
+                continue
+
+    def close(self) -> None:
+        self.running = False
+        try:
+            self.stream.stop()
+            self.stream.close()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 class WavInput:

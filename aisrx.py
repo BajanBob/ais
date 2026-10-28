@@ -111,6 +111,7 @@ def main() -> int:
     elif args.wav:
         cfg = {"station": {"name": "WAV FILE"}, "nmea_udp": [], "nmea_tcp_port": None}
     st = Station(cfg)
+    st.config_path = args.config  # the Settings page edits this file
 
     if args.demo:
         rx = st.add_audio_receiver({"name": "Demo receiver", "rig": "manual", "channel": "A"})

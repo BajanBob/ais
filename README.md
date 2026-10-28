@@ -16,7 +16,19 @@ Turns your VHF radios into a **receive-only AIS station**. It tunes the radios t
 
 The AIS channels are **AIS 1 / 87B = 161.975 MHz** and **AIS 2 / 88B = 162.025 MHz**, both FM. Each radio can stay on one channel or **scan** between them. If you have two radios, put one on each channel and you'll hear everything.
 
-### Getting good audio (important)
+### Settings page
+Click **⚙ Settings** at the top right of the display to set everything without editing files:
+- **Station:** name, latitude and longitude, used for range and bearing.
+- **Receivers:** radio type (Icom / Yaesu / Kenwood / Manual), CAT COM port and baud rate picked from lists,
+  Icom CI-V address, audio input, AIS channel (A, B or **Scan**), and how often Scan switches channel in minutes.
+  The default is 10 minutes.
+- **📡 Test CAT** retunes the radio right away so you can see CAT control working.
+- **💾 Save & apply** writes `config.json` and retunes the radios immediately; no restart needed.
+
+Ships alternate their reports between both AIS channels, so one radio fixed on one channel still sees every ship,
+just at half the update rate. Scanning shares time between the two; a second radio on the other channel is best.
+
+## Getting good audio (important)
 AIS is 9600-baud data. The **speaker or headphone jack usually filters the audio too much** for reliable decoding. Use the radio's **9600 data output**: the DATA jack's 9600 pin, or the USB audio codec with the radio set for 9600-bps data. Check your radio manual's data/packet settings for 9600 bps. Then:
 1. Run `python aisrx.py --list-audio` to find the radio's sound input.
 2. Set the computer's input level so the meter in the display sits around **-20 to -10 dBFS** on a busy channel. Turn off any "audio enhancements" or automatic gain on that input.
