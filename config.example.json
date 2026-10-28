@@ -1,6 +1,7 @@
 {
   "station": {
-    "name": "8PFX AIS MONITOR",
+    "name": "OCEAN CITY RADIO",
+    "callsign": "8PFX",
     "lat": 13.0975,
     "lon": -59.6167
   },
@@ -39,6 +40,10 @@
       "sample_rate": 48000,
       "channel": "A"
     }
+  ],
+
+  "share": [
+    { "name": "VesselTracker", "enabled": false, "host": "", "port": "", "protocol": "udp" }
   ],
 
   "nmea_in_udp": [],

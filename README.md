@@ -28,6 +28,18 @@ Click **⚙ Settings** at the top right of the display to set everything without
 Ships alternate their reports between both AIS channels, so one radio fixed on one channel still sees every ship,
 just at half the update rate. Scanning shares time between the two; a second radio on the other channel is best.
 
+## Sharing with AIS networks (VesselTracker, AISHub, MarineTraffic, VesselFinder)
+In **⚙ Settings → Data sharing**, click the network's button and enter the **host name and port** it gives you
+when you register your station, then **Save & apply**. The **Data sharing** panel shows a green light, the
+number of messages sent and the time of the last send for each network; a red light shows the error.
+
+- **VesselTracker:** apply as an AIS partner at vesseltracker.com (Community → free AIS receiver partnership).
+  Tell them you already run your own AIS receiver; they send you the address to feed and give partners a free
+  Coastal Account in return.
+- **AISHub, MarineTraffic, VesselFinder:** register a station on their sites; each gives you a UDP host and port.
+
+Only real reception is shared. Demo ships are never sent.
+
 ## Getting good audio (important)
 AIS is 9600-baud data. The **speaker or headphone jack usually filters the audio too much** for reliable decoding. Use the radio's **9600 data output**: the DATA jack's 9600 pin, or the USB audio codec with the radio set for 9600-bps data. Check your radio manual's data/packet settings for 9600 bps. Then:
 1. Run `python aisrx.py --list-audio` to find the radio's sound input.

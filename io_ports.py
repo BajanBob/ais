@@ -149,6 +149,86 @@ class NmeaSerialInput:
                 self.sink(line, self.name)
 
 
+# ------------------------------------------------------------------ sharing with AIS networks
+class Feed:
+    """Sends decoded AIS sentences to an AIS network (VesselTracker, AISHub, MarineTraffic, VesselFinder…).
+
+    UDP: each batch is sent as one datagram. TCP: keeps a connection open and
+    reconnects automatically (with back-off) if the network drops it.
+    """
+
+    def __init__(self, name: str, host: str, port: int, protocol: str = "udp") -> None:
+        self.name, self.host, self.port = name, host, int(port)
+        self.protocol = protocol.lower()
+        self.sent = 0
+        self.last_sent: float | None = None
+        self.error: str | None = None
+        self.sock: socket.socket | None = None
+        self.next_try = 0.0
+        self.lock = threading.Lock()
+        self.q: queue.Queue = queue.Queue(maxsize=2000)
+        self.running = True
+        threading.Thread(target=self._run, daemon=True, name=f"feed-{name}").start()
+
+    def send(self, sentences: list[str]) -> None:
+        try:
+            self.q.put_nowait("".join(s + "\r\n" for s in sentences).encode())
+        except queue.Full:
+            self.error = "queue full: network not keeping up"
+
+    def _connect(self) -> None:
+        if self.protocol == "tcp":
+            s = socket.create_connection((self.host, self.port), timeout=10)
+            s.settimeout(10)
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect((self.host, self.port))  # resolves the name once; errors show early
+        self.sock = s
+
+    def _run(self) -> None:
+        backoff = 5
+        while self.running:
+            try:
+                data = self.q.get(timeout=1)
+            except queue.Empty:
+                continue
+            if self.sock is None:
+                if time.time() < self.next_try:
+                    continue  # drop while offline rather than flood on reconnect
+                try:
+                    self._connect()
+                    self.error, backoff = None, 5
+                except OSError as e:
+                    self.error = f"cannot reach {self.host}:{self.port} ({e.strerror or e})"
+                    self.next_try, backoff = time.time() + backoff, min(backoff * 2, 300)
+                    continue
+            try:
+                self.sock.send(data) if self.protocol == "udp" else self.sock.sendall(data)
+                self.sent += data.count(b"\n")
+                self.last_sent = time.time()
+                self.error = None
+            except OSError as e:
+                self.error = f"send failed ({e.strerror or e}); reconnecting"
+                try:
+                    self.sock.close()
+                except OSError:
+                    pass
+                self.sock, self.next_try = None, time.time() + backoff
+
+    def close(self) -> None:
+        self.running = False
+        if self.sock:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+
+    def status(self) -> dict:
+        ok = self.error is None and self.last_sent is not None and time.time() - self.last_sent < 300
+        return {"name": self.name, "target": f"{self.protocol.upper()} {self.host}:{self.port}", "sent": self.sent,
+                "last_sent": self.last_sent, "error": self.error, "ok": ok}
+
+
 # ------------------------------------------------------------------ NMEA outputs
 class NmeaOutput:
     """Sends decoded sentences to chart plotters: UDP targets, a TCP server, and a log file."""

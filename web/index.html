@@ -3,215 +3,294 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AIS Station</title>
+<title>AIS Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
-:root{--bg:#06101a;--panel:#0c1824;--panel2:#10202f;--line:#1c3246;--ink:#d8e6f2;--dim:#7f97ad;
-  --a:#33d6ff;--b:#ffb020;--base:#e8eef5;--aton:#e05cff;--ok:#2ee6a6;--bad:#ff4d5e;--mono:ui-monospace,Consolas,monospace}
+:root{
+  --bg:#040a14; --bg2:#071224; --panel:#0a1830; --panel2:#0d1f3d; --edge:#16345e; --edge2:#1f4b85;
+  --ink:#d6e6ff; --dim:#7c94b8; --blue:#2f8cff; --cyan:#3ad0ff; --green:#39ff88; --green2:#1fbf62;
+  --red:#ff3b4e; --amber:#ffb020;
+  --lcd:"Share Tech Mono",ui-monospace,Consolas,monospace; --ui:"Rajdhani",system-ui,"Segoe UI",sans-serif;
+}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
-header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding:10px 16px;border-bottom:1px solid var(--line);background:#081420}
-header h1{margin:0;font-size:17px;letter-spacing:.14em}
-header h1 small{display:block;font-size:10px;color:var(--dim);letter-spacing:.2em;font-weight:500}
-.stat{font-size:11px;color:var(--dim)}.stat b{display:block;font:700 18px var(--mono);color:var(--ink)}
-.demo{background:#5a8cff;color:#fff;font-size:10px;padding:2px 8px;border-radius:99px;letter-spacing:.12em}
-.layout{display:grid;grid-template-columns:1fr 430px;height:calc(100% - 62px)}
-@media (max-width:1000px){.layout{grid-template-columns:1fr;height:auto}#map{height:60vh}}
-.layout>div,aside{min-width:0}
-#map,#radar{height:100%;width:100%;min-height:380px;background:#0a1825}
-.rx .small{overflow-wrap:anywhere}
-#radar{display:none}
-aside{overflow:auto;border-left:1px solid var(--line);padding:10px;display:grid;gap:10px;align-content:start}
-.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;padding:10px}
-.card h2{margin:0 0 8px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);display:flex;gap:8px;align-items:center}
-.card h2 span{flex:1}
-.rx{border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:#0a1622}
-.rx .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.rx b{font-size:13px}
-.led{display:inline-block;width:9px;height:9px;border-radius:50%;background:#3a4a5a;margin-right:6px}
-.led.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}.led.err{background:var(--bad)}
-.meter{height:7px;border-radius:4px;background:#13283a;overflow:hidden;margin:6px 0 4px}
-.meter i{display:block;height:100%;background:linear-gradient(90deg,#2ee6a6,#ffd34d 75%,#ff4d5e);transition:width .3s}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.35 var(--ui)}
+body{background:radial-gradient(1200px 600px at 75% -15%,#0d2a55 0,transparent 60%),linear-gradient(#040a14,#030812)}
+button,select,input{font:inherit}
+/* ---------- top bar ---------- */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;padding:10px 16px;border-bottom:1px solid var(--edge);
+  background:linear-gradient(180deg,#0b1d3a,#06101f);box-shadow:0 2px 0 #0f2a50 inset}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .badge{font:700 22px var(--lcd);color:var(--green);text-shadow:0 0 10px #39ff8866;border:1px solid var(--green2);
+  border-radius:6px;padding:2px 10px;background:#04150c}
+.brand b{display:block;font-size:17px;letter-spacing:.18em;font-weight:700}
+.brand small{color:var(--dim);letter-spacing:.2em;font-size:10px}
+.ro{background:#3a0d14;color:#ff8a96;border:1px solid var(--red);border-radius:4px;font-size:10px;letter-spacing:.16em;padding:1px 6px;margin-left:6px}
+.clock{font:26px var(--lcd);color:var(--cyan);text-shadow:0 0 12px #3ad0ff55;letter-spacing:.06em}
+.clock small{font:11px var(--ui);color:var(--dim);letter-spacing:.2em;margin-left:4px}
+.kpis{display:flex;gap:6px}
+.kpi{background:#04101f;border:1px solid var(--edge);border-radius:8px;padding:3px 10px;min-width:82px;text-align:center}
+.kpi i{display:block;font-style:normal;font-size:9px;letter-spacing:.18em;color:var(--dim)}
+.kpi b{font:20px var(--lcd);color:var(--green)}
+.sp{flex:1}
+.btn{color:var(--ink);background:linear-gradient(#123063,#0b1f42);border:1px solid var(--edge2);border-radius:8px;padding:7px 14px;cursor:pointer;letter-spacing:.06em;font-weight:600}
+.btn:hover{border-color:var(--cyan);box-shadow:0 0 10px #3ad0ff44}
+.btn.go{background:linear-gradient(#0f5a33,#0a3a22);border-color:var(--green2)}
+.btn.del{background:linear-gradient(#5a1420,#3a0d14);border-color:var(--red)}
+.demo{background:#123063;border:1px solid var(--blue);color:#9cc6ff;font-size:10px;letter-spacing:.16em;padding:2px 8px;border-radius:99px}
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:12px;padding:12px;height:calc(100% - 64px)}
+@media (max-width:1100px){.grid{grid-template-columns:1fr;height:auto}#map,#radar{height:60vh}}
+.col{display:grid;gap:12px;align-content:start;min-width:0;overflow:auto}
+.panel{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--edge);border-radius:12px;padding:10px 12px;
+  box-shadow:0 0 0 1px #000 inset,0 8px 24px #0006;min-width:0}
+.panel h2{margin:0 0 8px;font-size:11px;letter-spacing:.24em;color:var(--cyan);text-transform:uppercase;display:flex;gap:8px;align-items:center}
+.panel h2 .sp{flex:1}
+.mapwrap{position:relative;border:1px solid var(--edge);border-radius:12px;overflow:hidden;min-height:420px}
+#map,#radar{height:100%;width:100%;min-height:420px;background:#061226}#radar{display:none}
+.leaflet-container{background:#061226}
+/* ---------- radio panels ---------- */
+.radio{border:1px solid var(--edge2);border-radius:10px;padding:10px;margin-bottom:10px;background:linear-gradient(180deg,#0b1a33,#081327)}
+.radio .row1{display:flex;align-items:center;gap:8px}
+.radio .name{font-weight:700;letter-spacing:.1em;flex:1}
+.led{width:10px;height:10px;border-radius:50%;background:#2a3a55;display:inline-block}
+.led.g{background:var(--green);box-shadow:0 0 8px var(--green)}.led.r{background:var(--red);box-shadow:0 0 8px var(--red)}.led.b{background:var(--blue);box-shadow:0 0 8px var(--blue)}
+.led.blink{animation:blink 1s steps(2) infinite}
+.lcd{margin:8px 0;padding:8px 12px;border-radius:8px;background:#021208;border:1px solid #0f4a2a;box-shadow:inset 0 0 18px #000;
+  display:flex;align-items:baseline;gap:10px}
+.lcd .f{font:40px var(--lcd);color:var(--green);text-shadow:0 0 14px #39ff8877;letter-spacing:.04em}
+.lcd .u{font:16px var(--lcd);color:var(--green2)}
+.lcd .ch{margin-left:auto;text-align:right;font:13px var(--lcd);color:var(--cyan);line-height:1.2}
+.lcd .ch b{display:block;font-size:18px;color:var(--green)}
 .seg{display:flex;gap:4px}
-.seg button{font:inherit;font-size:11px;color:var(--ink);background:#10202f;border:1px solid var(--line);border-radius:7px;padding:2px 9px;cursor:pointer}
-.seg button.on{border-color:var(--a);color:var(--a)}
-.small{font-size:11px;color:var(--dim)}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:left;font-size:10px;color:var(--dim);font-weight:500;letter-spacing:.08em;text-transform:uppercase;padding:4px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
-td{padding:4px;border-bottom:1px solid #12263a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
-tr{cursor:pointer}tr:hover td{background:#12263a}tr.sel td{background:#173350}
-.scroll{max-height:330px;overflow:auto}
-.dotc{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}.kv dt{color:var(--dim)}.kv dd{margin:0;font-family:var(--mono)}
-.log{font:11px/1.5 var(--mono);color:#9fb6cb;max-height:170px;overflow:auto;white-space:pre}
-input.search{background:#0a1622;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:3px 7px;font-size:11px;width:120px}
-.leaflet-container{background:#0a1825}
-.ship{transition:transform .4s}
-.btn{font:inherit;font-size:13px;color:var(--ink);background:#10202f;border:1px solid var(--a);border-radius:8px;padding:6px 14px;cursor:pointer}
-.btn:hover{background:#163048}.btn.go{background:#0f3a2c;border-color:var(--ok)}.btn.del{border-color:#ff4d5e;color:#ff8a96}
-#settings{display:none;position:fixed;inset:0;background:#000b;z-index:5000;overflow:auto}
-#settings .box{max-width:860px;margin:30px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
-#settings h3{margin:0 0 4px;font-size:18px}#settings h4{margin:16px 0 8px;font-size:11px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 14px}
-.fld label{display:block;font-size:11px;color:var(--dim);margin-bottom:3px}
-.fld input,.fld select{width:100%;background:#0a1622;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:7px 8px;font:inherit}
-.rxcard{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:#0a1622}
-.rxcard .head{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-.rxcard .head input[type=text]{flex:1;min-width:160px}
-.msg{margin-top:8px;font-size:12px;padding:8px 10px;border-radius:8px;display:none}
-.msg.ok{display:block;background:#0f3a2c;color:#7af0c4}.msg.bad{display:block;background:#3a0d14;color:#ff8a96}
-.hint{font-size:11px;color:var(--dim);margin-top:3px}
+.seg button{background:#081a33;border:1px solid var(--edge2);color:var(--dim);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:700}
+.seg button.on{background:#0c3a6e;color:#fff;border-color:var(--cyan);box-shadow:0 0 8px #3ad0ff55}
+.bar{height:8px;border-radius:4px;background:#0a1a30;overflow:hidden;margin:6px 0 4px;border:1px solid #12305a}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#1fbf62,#39ff88 60%,#ffb020 80%,#ff3b4e);transition:width .3s}
+.meta{font-size:12px;color:var(--dim)}
+.meta b{color:var(--ink);font-weight:600}
+.err{color:#ff8a96}
+/* ---------- target readouts ---------- */
+.target .tname{font-size:18px;font-weight:700;letter-spacing:.06em}
+.target .tsub{color:var(--dim);font-size:12px;margin-bottom:8px}
+.dials{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.dial{background:#020c1a;border:1px solid var(--edge);border-radius:8px;padding:6px 10px;box-shadow:inset 0 0 14px #000}
+.dial i{font-style:normal;font-size:9px;letter-spacing:.2em;color:var(--dim);display:block}
+.dial b{font:30px var(--lcd);color:var(--cyan);text-shadow:0 0 10px #3ad0ff55}
+.dial b.g{color:var(--green);text-shadow:0 0 10px #39ff8855}
+.dial small{font:13px var(--lcd);color:var(--dim);margin-left:4px}
+.compass{display:flex;align-items:center;gap:10px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px;margin-top:8px}
+.kv dt{color:var(--dim)}.kv dd{margin:0;font-family:var(--lcd);overflow-wrap:anywhere}
+/* ---------- tables & lists ---------- */
+input.search{background:#04101f;border:1px solid var(--edge2);color:var(--ink);border-radius:7px;padding:4px 8px;width:140px}
+.scroll{max-height:300px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10px;letter-spacing:.14em;color:var(--dim);font-weight:600;padding:5px;border-bottom:1px solid var(--edge2);position:sticky;top:0;background:var(--panel)}
+td{padding:5px;border-bottom:1px solid #0f2547;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+td.n{font-family:var(--lcd);color:var(--cyan)}
+tr.click{cursor:pointer}tr.click:hover td{background:#0f2a50}tr.sel td{background:#123a6e}
+.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.feed{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #0f2547}
+.feed .t{flex:1}.feed small{display:block;color:var(--dim);font-size:11px}
+.log{font:12px/1.5 var(--lcd);color:#7fe0a8;max-height:150px;overflow:auto;white-space:pre;background:#020c14;border-radius:8px;padding:6px 8px;border:1px solid #0f3a2a}
+.hint{font-size:12px;color:var(--dim)}
+/* ---------- settings ---------- */
+#settings{display:none;position:fixed;inset:0;background:#000c;z-index:5000;overflow:auto}
+#settings .box{max-width:900px;margin:28px auto;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--edge2);border-radius:14px;padding:18px}
+#settings h3{margin:0;font-size:20px;letter-spacing:.1em}
+#settings h4{margin:18px 0 8px;font-size:11px;letter-spacing:.22em;color:var(--cyan);text-transform:uppercase}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px}
+.fld label{display:block;font-size:11px;letter-spacing:.06em;color:var(--dim);margin-bottom:3px}
+.fld input,.fld select{width:100%;background:#04101f;border:1px solid var(--edge2);color:var(--ink);border-radius:7px;padding:7px 8px}
+.card{border:1px solid var(--edge2);border-radius:12px;padding:12px;margin-bottom:12px;background:#081429}
+.card .head{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.card .head input[type=text]{flex:1;min-width:160px;background:#04101f;border:1px solid var(--edge2);color:var(--ink);border-radius:7px;padding:7px 8px}
+.msg{margin-top:8px;font-size:13px;padding:8px 10px;border-radius:8px;display:none}
+.msg.ok{display:block;background:#0a3a22;color:#8affbf;border:1px solid var(--green2)}.msg.bad{display:block;background:#3a0d14;color:#ff8a96;border:1px solid var(--red)}
+@keyframes blink{50%{opacity:.25}}
 </style>
 </head>
 <body>
-<header>
-  <h1 id="title">AIS STATION<small>RECEIVE-ONLY · VHF 161.975 / 162.025 MHz</small></h1>
-  <div class="stat">Vessels<b id="sVessels">0</b></div>
-  <div class="stat">Messages/min<b id="sRate">0</b></div>
-  <div class="stat">Total messages<b id="sTotal">0</b></div>
-  <div class="stat">Best range<b id="sRange">–</b></div>
-  <div class="stat">Uptime<b id="sUp">–</b></div>
-  <span id="demoTag"></span>
-  <span style="flex:1"></span>
-  <button class="btn" id="openSettings">⚙ Settings</button>
-</header>
+<div class="top">
+  <div class="brand"><span class="badge" id="call">8PFX</span>
+    <div><b id="stName">AIS CONSOLE</b><small>VHF AIS · 161.975 / 162.025 MHz<span class="ro">RECEIVE ONLY</span></small></div></div>
+  <div class="clock" id="utc">--:--:--<small>UTC</small></div>
+  <div class="kpis">
+    <div class="kpi"><i>VESSELS</i><b id="kV">0</b></div>
+    <div class="kpi"><i>MSG/MIN</i><b id="kR">0</b></div>
+    <div class="kpi"><i>BEST RANGE</i><b id="kM">--</b></div>
+    <div class="kpi"><i>SHARED</i><b id="kS">--</b></div>
+  </div>
+  <span id="demoTag"></span><span class="sp"></span>
+  <button class="btn" id="openSettings">⚙ SETTINGS</button>
+</div>
+
+<div class="grid">
+  <div class="col" style="grid-template-rows:auto 1fr">
+    <div class="panel"><h2>Receivers<span class="sp"></span><span class="hint" id="outs"></span></h2><div id="rxs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px"></div></div>
+    <div class="mapwrap"><div id="map"></div><svg id="radar" viewBox="-110 -110 220 220"></svg></div>
+  </div>
+  <div class="col">
+    <div class="panel target"><h2>Target from <span id="tFrom">8PFX</span></h2><div id="target"><div class="hint">Select a vessel on the chart or in the list.</div></div></div>
+    <div class="panel"><h2><span>Vessels</span><span class="sp"></span><input class="search" id="q" placeholder="Name, MMSI…"></h2>
+      <div class="scroll"><table><thead><tr><th>Vessel</th><th>Type</th><th>Kn</th><th>Range</th><th>Brg</th><th>Seen</th></tr></thead><tbody id="list"></tbody></table></div></div>
+    <div class="panel"><h2>Data sharing</h2><div id="feeds"></div></div>
+    <div class="panel"><h2>Live NMEA</h2><div class="log" id="log"></div></div>
+  </div>
+</div>
+
 <div id="settings"><div class="box">
-  <div style="display:flex;align-items:center;gap:10px"><h3 style="flex:1">⚙ Settings</h3>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="flex:1">⚙ SETTINGS</h3>
     <button class="btn" id="refreshLists">↻ Refresh ports &amp; audio</button><button class="btn" id="closeSettings">✕ Close</button></div>
   <div class="hint" id="cfgPath"></div>
   <h4>Station</h4>
-  <div class="grid2">
+  <div class="g2">
     <div class="fld"><label>Station name</label><input id="sName"></div>
+    <div class="fld"><label>Call sign</label><input id="sCall" placeholder="8PFX"></div>
     <div class="fld"><label>Latitude (e.g. 13.0975)</label><input id="sLat" inputmode="decimal"></div>
     <div class="fld"><label>Longitude (west is negative, e.g. -59.6167)</label><input id="sLon" inputmode="decimal"></div>
   </div>
   <h4>Receivers</h4>
   <div id="rxForms"></div>
   <button class="btn" id="addRx">＋ Add receiver</button>
-  <div style="display:flex;gap:10px;margin-top:16px;align-items:center">
-    <button class="btn go" id="saveSettings">💾 Save &amp; apply</button><span class="hint">Settings are saved to config.json and the radios are retuned right away.</span></div>
+  <h4>Data sharing with AIS networks</h4>
+  <div class="hint" style="margin-bottom:8px">Each network gives you a host name and port when you register your station (VesselTracker sends them after you sign up as an AIS partner).
+    Only real reception is shared; demo ships never are.</div>
+  <div id="shareForms"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn" data-preset="VesselTracker">＋ VesselTracker</button><button class="btn" data-preset="AISHub">＋ AISHub</button>
+    <button class="btn" data-preset="MarineTraffic">＋ MarineTraffic</button><button class="btn" data-preset="VesselFinder">＋ VesselFinder</button>
+    <button class="btn" data-preset="Other network">＋ Other</button></div>
+  <div style="display:flex;gap:10px;margin-top:18px;align-items:center;flex-wrap:wrap">
+    <button class="btn go" id="saveSettings">💾 SAVE &amp; APPLY</button><span class="hint">Saved to config.json; radios are retuned and sharing restarts immediately.</span></div>
   <div class="msg" id="saveMsg"></div>
 </div></div>
-<div class="layout">
-  <div><div id="map"></div><svg id="radar" viewBox="-110 -110 220 220"></svg></div>
-  <aside>
-    <div class="card"><h2><span>Receivers</span></h2><div id="rxs"></div><div class="small" id="outs"></div></div>
-    <div class="card"><h2><span>Selected vessel</span></h2><div id="detail" class="small">Click a ship on the map or in the list.</div></div>
-    <div class="card"><h2><span>Vessels</span><input class="search" id="q" placeholder="Name, MMSI…"></h2>
-      <div class="scroll"><table><thead><tr><th>Name / MMSI</th><th>Type</th><th>Kn</th><th>Range</th><th>Seen</th></tr></thead><tbody id="list"></tbody></table></div></div>
-    <div class="card"><h2><span>Live NMEA</span></h2><div class="log" id="log"></div></div>
-  </aside>
-</div>
+
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const ago = t => { if (!t) return "–"; const s = Math.max(0, Date.now()/1000 - t); return s < 60 ? Math.round(s)+"s" : s < 3600 ? Math.round(s/60)+"m" : Math.round(s/3600)+"h"; };
-const COLOR = {A:"#33d6ff", B:"#ffb020", "Base station":"#e8eef5", AtoN:"#e05cff"};
-const color = v => COLOR[v.cls] || "#9fb6cb";
-let selected = null, last = null, map = null, layer = null, markers = {}, stationMarker = null, centred = false;
+const ago = t => { if (!t) return "--"; const s = Math.max(0, Date.now()/1000 - t); return s < 60 ? Math.round(s)+"s" : s < 3600 ? Math.round(s/60)+"m" : Math.round(s/3600)+"h"; };
+const pad = (n, w) => String(n).padStart(w, "0");
+const COLOR = {A: "#3ad0ff", B: "#39ff88", "Base station": "#e8eef5", AtoN: "#c77dff"};
+const color = v => COLOR[v.cls] || "#7c94b8";
+const card = deg => ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(deg / 22.5) % 16];
+let selected = null, last = null, map = null, layer = null, markers = {}, inited = false, line = null;
 
+/* ---------------- chart ---------------- */
 function shipSvg(v) {
   const c = color(v);
-  if (v.cls === "Base station") return `<svg width="16" height="16" viewBox="-8 -8 16 16"><rect x="-5" y="-5" width="10" height="10" fill="${c}" stroke="#000" stroke-width="1"/></svg>`;
+  if (v.cls === "Base station") return `<svg width="16" height="16" viewBox="-8 -8 16 16"><rect x="-5" y="-5" width="10" height="10" fill="${c}" stroke="#000"/></svg>`;
   if (v.cls === "AtoN") return `<svg width="16" height="16" viewBox="-8 -8 16 16"><path d="M0-7 7 0 0 7-7 0Z" fill="${c}" stroke="#000"/></svg>`;
-  const rot = v.heading ?? v.cog ?? 0, moving = (v.sog || 0) > 0.5;
-  return `<svg width="26" height="26" viewBox="-13 -13 26 26" style="transform:rotate(${rot}deg)">
-    ${moving ? `<line x1="0" y1="-7" x2="0" y2="-13" stroke="${c}" stroke-width="1.5"/>` : ""}
-    <path d="M0-8 5 7 0 4-5 7Z" fill="${c}" stroke="#001" stroke-width="1"/></svg>`;
+  const rot = v.heading ?? v.cog ?? 0, sel = v.mmsi === selected;
+  return `<svg width="28" height="28" viewBox="-14 -14 28 28" style="transform:rotate(${rot}deg)">${(v.sog || 0) > .5 ? `<line x1="0" y1="-7" x2="0" y2="-14" stroke="${c}" stroke-width="1.5"/>` : ""}
+    <path d="M0-8 5 7 0 4-5 7Z" fill="${sel ? "#ff3b4e" : c}" stroke="${sel ? "#fff" : "#001"}" stroke-width="${sel ? 1.5 : 1}"/></svg>`;
 }
-
 function initMap(st) {
   if (typeof L === "undefined") { $("#map").style.display = "none"; $("#radar").style.display = "block"; return; }
-  map = L.map("map", {zoomControl: true, attributionControl: true}).setView([st.lat ?? 13.1, st.lon ?? -59.6], 10);
+  map = L.map("map").setView([st.lat ?? 13.1, st.lon ?? -59.6], 10);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 17,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
   layer = L.layerGroup().addTo(map);
   if (st.lat != null) {
-    stationMarker = L.circleMarker([st.lat, st.lon], {radius: 7, color: "#2ee6a6", fillColor: "#2ee6a6", fillOpacity: .9})
-      .addTo(map).bindTooltip(esc(st.name));
-    [10, 20, 40].forEach(nm => L.circle([st.lat, st.lon], {radius: nm * 1852, color: "#2ee6a6", weight: 1, opacity: .25, fill: false, dashArray: "4 6"}).addTo(map));
+    L.marker([st.lat, st.lon], {icon: L.divIcon({className: "", iconSize: [20, 20], iconAnchor: [10, 10],
+      html: `<svg width="20" height="20" viewBox="-10 -10 20 20"><circle r="8" fill="none" stroke="#39ff88" stroke-width="2"/><circle r="3" fill="#39ff88"/></svg>`})})
+      .addTo(map).bindTooltip(`${esc(st.callsign || "")} ${esc(st.name)}`);
+    [10, 20, 40].forEach(nm => L.circle([st.lat, st.lon], {radius: nm * 1852, color: "#2f8cff", weight: 1, opacity: .35, fill: false, dashArray: "4 6"})
+      .bindTooltip(nm + " nm").addTo(map));
   }
 }
-
 function drawMap(s) {
   const seen = new Set();
   for (const v of s.vessels) {
-    if (v.lat == null) continue;
-    seen.add(v.mmsi);
-    const icon = L.divIcon({html: shipSvg(v), className: "", iconSize: [26, 26], iconAnchor: [13, 13]});
+    if (v.lat == null) continue; seen.add(v.mmsi);
+    const icon = L.divIcon({html: shipSvg(v), className: "", iconSize: [28, 28], iconAnchor: [14, 14]});
     let m = markers[v.mmsi];
-    const label = esc(v.name || v.mmsi);
-    if (!m) {
-      m = markers[v.mmsi] = {mk: L.marker([v.lat, v.lon], {icon}).addTo(layer), tr: L.polyline([], {color: color(v), weight: 1.5, opacity: .5}).addTo(layer)};
-      m.mk.on("click", () => select(v.mmsi));
-    } else { m.mk.setLatLng([v.lat, v.lon]); m.mk.setIcon(icon); }
-    m.mk.bindTooltip(label, {direction: "top", offset: [0, -10]});
+    if (!m) { m = markers[v.mmsi] = {mk: L.marker([v.lat, v.lon], {icon}).addTo(layer), tr: L.polyline([], {color: color(v), weight: 1.5, opacity: .5}).addTo(layer)};
+      m.mk.on("click", () => select(v.mmsi)); }
+    else { m.mk.setLatLng([v.lat, v.lon]); m.mk.setIcon(icon); }
+    m.mk.bindTooltip(esc(v.name || v.mmsi), {direction: "top", offset: [0, -10]});
     m.tr.setLatLngs(v.track || []);
   }
   for (const k of Object.keys(markers)) if (!seen.has(+k)) { layer.removeLayer(markers[k].mk); layer.removeLayer(markers[k].tr); delete markers[k]; }
+  const v = s.vessels.find(x => x.mmsi === selected), st = s.station;
+  if (line) { map.removeLayer(line); line = null; }
+  if (v && v.lat != null && st.lat != null)
+    line = L.polyline([[st.lat, st.lon], [v.lat, v.lon]], {color: "#ff3b4e", weight: 2, dashArray: "6 6"})
+      .bindTooltip(`${v.range_nm} nm · ${pad(v.bearing, 3)}°`, {permanent: true, className: ""}).addTo(map);
 }
-
-function drawRadar(s) {  // offline fallback: plot by range and bearing
+function drawRadar(s) {
   const R = Math.max(10, ...s.vessels.map(v => v.range_nm || 0)) * 1.1;
-  let g = [10, 25, 50, 100].filter(r => r < R * 1.2).map(r => `<circle r="${100 * r / R}" fill="none" stroke="#1f4a3a" stroke-dasharray="2 3"/><text x="${100 * r / R + 2}" y="-2" fill="#3f7a64" font-size="5">${r} nm</text>`).join("");
-  g += `<line x1="-100" y1="0" x2="100" y2="0" stroke="#163428"/><line x1="0" y1="-100" x2="0" y2="100" stroke="#163428"/><circle r="2.5" fill="#2ee6a6"/>`;
+  let g = [10, 25, 50, 100].filter(r => r < R * 1.2).map(r => `<circle r="${100 * r / R}" fill="none" stroke="#1f4b85" stroke-dasharray="2 3"/><text x="${100 * r / R + 2}" y="-2" fill="#4d7ab8" font-size="5">${r} nm</text>`).join("");
+  g += `<line x1="-100" y1="0" x2="100" y2="0" stroke="#12305a"/><line x1="0" y1="-100" x2="0" y2="100" stroke="#12305a"/><circle r="2.5" fill="#39ff88"/>`;
   for (const v of s.vessels) if (v.range_nm != null) {
-    const a = (v.bearing - 90) * Math.PI / 180, r = 100 * v.range_nm / R;
-    g += `<g transform="translate(${r * Math.cos(a)},${r * Math.sin(a)})" onclick="select(${v.mmsi})" style="cursor:pointer"><circle r="2.6" fill="${color(v)}"/><text x="4" y="1.5" fill="#cfe" font-size="4.5">${esc(v.name || v.mmsi)}</text></g>`;
+    const a = (v.bearing - 90) * Math.PI / 180, r = 100 * v.range_nm / R, x = r * Math.cos(a), y = r * Math.sin(a), sel = v.mmsi === selected;
+    if (sel) g += `<line x1="0" y1="0" x2="${x}" y2="${y}" stroke="#ff3b4e" stroke-dasharray="3 2" stroke-width=".8"/>`;
+    g += `<g transform="translate(${x},${y})" onclick="select(${v.mmsi})" style="cursor:pointer"><circle r="${sel ? 3.4 : 2.6}" fill="${sel ? "#ff3b4e" : color(v)}"/><text x="4" y="1.5" fill="#cfe" font-size="4.5">${esc(v.name || v.mmsi)}</text></g>`;
   }
-  $("#radar").innerHTML = g + `<text x="-106" y="-100" fill="#7f97ad" font-size="5">Offline view: range & bearing from station (map tiles need internet)</text>`;
+  $("#radar").innerHTML = g + `<text x="-106" y="-102" fill="#7c94b8" font-size="5">Offline view: range &amp; bearing from station (chart tiles need internet)</text>`;
 }
-
-function select(mmsi) {
-  selected = mmsi; render(last);
-  const v = last.vessels.find(x => x.mmsi === mmsi);
-  if (map && v && v.lat != null) map.panTo([v.lat, v.lon]);
-}
+function select(mmsi) { selected = mmsi; render(last);
+  const v = last.vessels.find(x => x.mmsi === mmsi); if (map && v && v.lat != null) map.panTo([v.lat, v.lon]); }
 window.select = select;
 
+/* ---------------- render ---------------- */
 function render(s) {
   if (!s) return;
-  $("#title").innerHTML = `${esc(s.station.name)}<small>RECEIVE-ONLY · VHF AIS 161.975 / 162.025 MHz</small>`;
-  $("#sVessels").textContent = s.vessels.length;
-  $("#sRate").textContent = s.stats.per_min;
-  $("#sTotal").textContent = s.stats.messages;
-  $("#sRange").textContent = s.stats.max_range_nm ? s.stats.max_range_nm + " nm" : "–";
-  const u = s.stats.uptime; $("#sUp").textContent = `${Math.floor(u / 3600)}h ${Math.floor(u / 60) % 60}m`;
+  const st = s.station, cs = st.callsign || "STATION";
+  $("#call").textContent = cs; $("#tFrom").textContent = cs; $("#stName").textContent = (st.name || "AIS CONSOLE").toUpperCase();
+  $("#kV").textContent = s.vessels.length; $("#kR").textContent = s.stats.per_min;
+  $("#kM").textContent = s.stats.max_range_nm ? s.stats.max_range_nm + "nm" : "--";
+  $("#kS").textContent = s.feeds.length ? s.feeds.reduce((a, f) => a + f.sent, 0) : "OFF";
   $("#demoTag").innerHTML = s.demo ? `<span class="demo">DEMO · SIMULATED SHIPS</span>` : "";
+  $("#outs").textContent = `NMEA → ${s.outputs.udp.join(", ") || "UDP off"} · TCP ${s.outputs.tcp || "off"}`;
 
-  $("#rxs").innerHTML = s.receivers.map(r => {
+  $("#rxs").innerHTML = s.receivers.length ? s.receivers.map(r => {
     const live = r.last_frame && Date.now() / 1000 - r.last_frame < 120, pct = Math.max(0, Math.min(100, (r.level_db + 60) / 60 * 100));
-    return `<div class="rx"><div class="top"><div><span class="led ${r.cat_ok ? (live ? "on" : "") : "err"}"></span><b>${esc(r.name)}</b>
-      <span class="small"> · ${r.channel === "A" ? "AIS 1 (87B)" : "AIS 2 (88B)"} ${r.mhz.toFixed(3)} MHz</span></div>
-      <div class="seg">${["A", "B", "SCAN"].map(m => `<button class="${r.mode === m ? "on" : ""}" onclick="setCh('${esc(r.name)}','${m}')">${m === "SCAN" ? "Scan" : m}</button>`).join("")}</div></div>
-      <div class="meter"><i style="width:${pct}%"></i></div>
-      <div class="small">Audio ${r.level_db} dBFS · ${r.frames} decoded · last ${ago(r.last_frame)} ago · ${esc(r.rig.toUpperCase())}: ${esc(r.rig_status)}
-      ${r.mode === "SCAN" ? ` · scanning every ${Math.round(r.scan_s / 60)} min, next switch in ${Math.floor(r.next_switch_s / 60)}:${String(r.next_switch_s % 60).padStart(2, "0")}` : ""}</div></div>`;
-  }).join("") + (s.inputs.length ? `<div class="small">Also receiving NMEA from: ${s.inputs.map(esc).join(", ")}</div>` : "");
-  $("#outs").textContent = `NMEA out → UDP ${s.outputs.udp.join(", ") || "off"} · TCP ${s.outputs.tcp || "off"}`;
+    const [mhz, khz] = r.mhz.toFixed(3).split(".");
+    const scan = r.mode === "SCAN" ? `SCAN ${pad(Math.floor(r.next_switch_s / 60), 2)}:${pad(r.next_switch_s % 60, 2)}` : "FIXED";
+    return `<div class="radio"><div class="row1"><span class="led ${r.cat_ok ? "g" : "r blink"}" title="CAT"></span><span class="name">${esc(r.name)}</span>
+      <span class="led ${live ? "g" : "b"}" title="Decoding"></span>
+      <div class="seg">${["A", "B", "SCAN"].map(m => `<button class="${r.mode === m ? "on" : ""}" onclick="setCh(${esc(JSON.stringify(r.name))},'${m}')">${m}</button>`).join("")}</div></div>
+      <div class="lcd"><span class="f">${mhz}.${khz}</span><span class="u">MHz FM</span>
+        <span class="ch"><b>${r.channel === "A" ? "AIS 1" : "AIS 2"}</b>${r.channel === "A" ? "CH 87B" : "CH 88B"} · ${scan}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="meta">AUDIO <b>${r.level_db} dBFS</b> · DECODED <b>${r.frames}</b> · LAST <b>${ago(r.last_frame)}</b><br>
+        <span class="${r.cat_ok ? "" : "err"}">${esc(r.rig.toUpperCase())}: ${esc(r.rig_status)}</span></div></div>`;
+  }).join("") : `<div class="hint">No receivers configured. Open ⚙ SETTINGS to add your radios.</div>`;
 
   const q = $("#q").value.trim().toLowerCase();
   const rows = s.vessels.filter(v => !q || `${v.name || ""} ${v.mmsi} ${v.callsign || ""}`.toLowerCase().includes(q));
-  $("#list").innerHTML = rows.map(v => `<tr class="${v.mmsi === selected ? "sel" : ""}" onclick="select(${v.mmsi})">
-    <td><span class="dotc" style="background:${color(v)}"></span>${esc(v.name || v.mmsi)}</td><td>${esc(v.shiptype_name || v.aid_type || v.cls || "")}</td>
-    <td>${v.sog ?? ""}</td><td>${v.range_nm != null ? v.range_nm + " nm" : ""}</td><td>${ago(v.last)}</td></tr>`).join("") ||
-    `<tr><td colspan="5" class="small">No vessels yet. Check the audio meter moves when the channel is busy.</td></tr>`;
+  $("#list").innerHTML = rows.map(v => `<tr class="click ${v.mmsi === selected ? "sel" : ""}" onclick="select(${v.mmsi})">
+    <td><span class="dot" style="background:${color(v)}"></span>${esc(v.name || v.mmsi)}</td><td>${esc(v.shiptype_name || v.aid_type || v.cls || "")}</td>
+    <td class="n">${v.sog ?? ""}</td><td class="n">${v.range_nm != null ? v.range_nm : ""}</td><td class="n">${v.bearing != null ? pad(v.bearing, 3) : ""}</td><td>${ago(v.last)}</td></tr>`).join("") ||
+    `<tr><td colspan="6" class="hint">No vessels yet. Check the audio bar moves when the channel is busy.</td></tr>`;
 
   const v = s.vessels.find(x => x.mmsi === selected);
-  $("#detail").innerHTML = v ? `<dl class="kv">${[
-      ["Name", v.name], ["MMSI", v.mmsi], ["Call sign", v.callsign], ["IMO", v.imo], ["Class", v.cls], ["Type", v.shiptype_name || v.aid_type],
-      ["Status", v.status], ["Position", v.lat != null ? `${v.lat.toFixed(5)}, ${v.lon.toFixed(5)}` : null],
-      ["Speed / course", v.sog != null ? `${v.sog} kn / ${v.cog ?? "–"}°` : null], ["Heading", v.heading != null ? v.heading + "°" : null],
-      ["Range / bearing", v.range_nm != null ? `${v.range_nm} nm / ${v.bearing}°` : null], ["Destination", v.destination], ["ETA", v.eta],
-      ["Size", v.length ? `${v.length} × ${v.beam || "?"} m, draught ${v.draught ?? "?"} m` : null],
-      ["Heard via", (v.sources || []).join(", ") + ` · ch ${v.channel}`], ["Messages", v.count], ["Last heard", ago(v.last) + " ago"]]
-    .filter(([, x]) => x != null && x !== "").map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join("")}</dl>` : "Click a ship on the map or in the list.";
+  $("#target").innerHTML = v ? `<div class="tname">${esc(v.name || "MMSI " + v.mmsi)}</div>
+    <div class="tsub">${esc([v.shiptype_name || v.cls, v.callsign, "MMSI " + v.mmsi].filter(Boolean).join(" · "))}</div>
+    <div class="dials">
+      <div class="dial"><i>RANGE FROM ${esc(cs)}</i><b class="g">${v.range_nm != null ? v.range_nm.toFixed(1) : "--.-"}</b><small>NM</small></div>
+      <div class="dial"><i>BEARING FROM ${esc(cs)}</i><b class="g">${v.bearing != null ? pad(v.bearing, 3) : "---"}</b><small>° ${v.bearing != null ? card(v.bearing) : ""}</small></div>
+      <div class="dial"><i>SPEED</i><b>${v.sog != null ? v.sog.toFixed(1) : "--.-"}</b><small>KN</small></div>
+      <div class="dial"><i>COURSE</i><b>${v.cog != null ? pad(Math.round(v.cog), 3) : "---"}</b><small>°</small></div></div>
+    <dl class="kv">${[["Position", v.lat != null ? `${v.lat.toFixed(5)}, ${v.lon.toFixed(5)}` : null], ["Status", v.status], ["Destination", v.destination], ["ETA", v.eta],
+      ["Size", v.length ? `${v.length} × ${v.beam || "?"} m · draught ${v.draught ?? "?"} m` : null], ["Heard via", (v.sources || []).join(", ") + " · ch " + v.channel],
+      ["Last heard", ago(v.last) + " ago"]].filter(([, x]) => x != null && x !== "").map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join("")}</dl>`
+    : `<div class="hint">Select a vessel on the chart or in the list to see its range and bearing from ${esc(cs)}.</div>`;
 
-  $("#log").textContent = s.log.slice().reverse().map(l => `${new Date(l.t * 1000).toLocaleTimeString()} ${l.nmea}`).join("\n");
+  $("#feeds").innerHTML = s.feeds.length ? s.feeds.map(f => `<div class="feed"><span class="led ${f.error ? "r" : f.ok ? "g" : "b"}"></span>
+    <div class="t"><b>${esc(f.name)}</b><small>${esc(f.target)}${f.error ? ` · <span class="err">${esc(f.error)}</span>` : ""}</small></div>
+    <div style="text-align:right"><b style="font:18px var(--lcd);color:var(--green)">${f.sent}</b><small class="hint" style="display:block">last ${ago(f.last_sent)}</small></div></div>`).join("")
+    : `<div class="hint">${s.demo ? "Sharing is switched off in demo mode." : "Not sharing yet. Add VesselTracker or another network in ⚙ SETTINGS."}</div>`;
+
+  $("#log").textContent = s.log.slice().reverse().map(l => `${new Date(l.t * 1000).toISOString().slice(11, 19)} ${l.nmea}`).join("\n");
   if (map) drawMap(s); else drawRadar(s);
 }
+setInterval(() => { $("#utc").firstChild.nodeValue = new Date().toISOString().slice(11, 19); }, 250);
 
 async function setCh(rx, mode) {
   await fetch("/api/channel", {method: "POST", headers: {"X-AIS": "1", "Content-Type": "application/json"}, body: JSON.stringify({rx, mode})});
@@ -226,19 +305,20 @@ const RIGS = {icom: "Icom (CI-V) — IC-9100 etc.", yaesu: "Yaesu CAT — FT-991
 const BAUDS = [4800, 9600, 19200, 38400, 57600, 115200];
 const DEF_BAUD = {icom: 19200, yaesu: 38400, kenwood: 9600};
 const opt = (v, label, sel) => `<option value="${esc(v)}" ${String(v) === String(sel) ? "selected" : ""}>${esc(label)}</option>`;
+const post = async (url, body) => (await fetch(url, {method: "POST", headers: {"X-AIS": "1", "Content-Type": "application/json"}, body: JSON.stringify(body)})).json();
 
 function rxForm(r, i) {
   const ports = S.ports.map(p => opt(p.device, `${p.device} — ${p.description}`, r.port));
   if (r.port && !S.ports.some(p => p.device === r.port)) ports.unshift(opt(r.port, `${r.port} (not plugged in now)`, r.port));
   const audio = S.audio.map(a => opt(a.index, `${a.index}: ${a.name}${a.api ? " (" + a.api + ")" : ""}`, r.audio_device));
   if (r.audio_device !== undefined && r.audio_device !== "" && !S.audio.some(a => String(a.index) === String(r.audio_device)))
-    audio.unshift(opt(r.audio_device, `${r.audio_device} (name from config.json)`, r.audio_device));
-  const cat = r.rig !== "manual";
-  return `<div class="rxcard" data-i="${i}">
-    <div class="head"><label class="small"><input type="checkbox" data-k="enabled" ${r.enabled !== false ? "checked" : ""}> On</label>
-      <input type="text" class="fld" data-k="name" value="${esc(r.name || "")}" placeholder="Receiver name" style="background:#0a1622;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:7px 8px">
-      <button class="btn" data-act="test">📡 Test CAT</button><button class="btn del" data-act="remove">Remove</button></div>
-    <div class="grid2">
+    audio.unshift(opt(r.audio_device, `${r.audio_device} (from config.json)`, r.audio_device));
+  const cat = r.rig !== "manual", ch = r.channel || "A";
+  return `<div class="card rxcard" data-i="${i}">
+    <div class="head"><label class="hint"><input type="checkbox" data-k="enabled" ${r.enabled !== false ? "checked" : ""}> On</label>
+      <input type="text" data-k="name" value="${esc(r.name || "")}" placeholder="Receiver name">
+      <button class="btn" data-act="test">📡 TEST CAT</button><button class="btn del" data-act="remove">Remove</button></div>
+    <div class="g2">
       <div class="fld"><label>Radio type / control</label><select data-k="rig">${Object.entries(RIGS).map(([k, v]) => opt(k, v, r.rig || "manual")).join("")}</select></div>
       <div class="fld" ${cat ? "" : "hidden"}><label>CAT COM port</label><select data-k="port"><option value="">— choose —</option>${ports.join("")}</select>
         <div class="hint">FT-991A: use the “Enhanced COM Port”.</div></div>
@@ -246,65 +326,71 @@ function rxForm(r, i) {
       <div class="fld" ${r.rig === "icom" ? "" : "hidden"}><label>Icom CI-V address</label><input data-k="civ_address" value="${esc(r.civ_address || "0x7C")}"><div class="hint">IC-9100 default: 0x7C</div></div>
       <div class="fld"><label>Audio input (radio's 9600 data audio)</label><select data-k="audio_device"><option value="">— none —</option>${audio.join("")}</select></div>
       <div class="fld"><label>Audio side</label><select data-k="audio_channel">${opt(0, "Left / mono", r.audio_channel || 0)}${opt(1, "Right", r.audio_channel || 0)}</select></div>
-      <div class="fld"><label>AIS channel</label><select data-k="channel">${opt("A", "A — 161.975 MHz (87B)", r.channel || "A")}${opt("B", "B — 162.025 MHz (88B)", r.channel || "A")}${opt("SCAN", "Scan A ↔ B", r.channel || "A")}</select></div>
-      <div class="fld" ${(r.channel || "A") === "SCAN" ? "" : "hidden"}><label>Switch channel every (minutes)</label>
-        <input data-k="scan_minutes" type="number" min="1" max="1440" value="${Math.round((r.scan_seconds || 600) / 60)}"></div>
-    </div>
-    <div class="msg" data-msg></div></div>`;
+      <div class="fld"><label>AIS channel</label><select data-k="channel">${opt("A", "A — 161.975 MHz (87B)", ch)}${opt("B", "B — 162.025 MHz (88B)", ch)}${opt("SCAN", "Scan A ↔ B", ch)}</select></div>
+      <div class="fld" ${ch === "SCAN" ? "" : "hidden"}><label>Switch channel every (minutes)</label><input data-k="scan_minutes" type="number" min="1" max="1440" value="${Math.round((r.scan_seconds || 600) / 60)}"></div>
+    </div><div class="msg" data-msg></div></div>`;
 }
-
-function readForms() {
-  return [...document.querySelectorAll(".rxcard")].map(card => {
-    const g = k => card.querySelector(`[data-k="${k}"]`);
-    const r = {name: g("name").value.trim(), enabled: g("enabled").checked, rig: g("rig").value, port: g("port").value,
-      baud: +g("baud").value, civ_address: g("civ_address").value.trim(), audio_device: g("audio_device").value,
-      audio_channel: +g("audio_channel").value, channel: g("channel").value, scan_seconds: Math.max(1, +g("scan_minutes").value || 10) * 60};
-    if (r.rig === "manual") { delete r.port; delete r.baud; delete r.civ_address; }
-    return r;
-  });
+function shareForm(s, i) {
+  return `<div class="card shcard" data-i="${i}"><div class="head"><label class="hint"><input type="checkbox" data-k="enabled" ${s.enabled !== false ? "checked" : ""}> On</label>
+      <input type="text" data-k="name" value="${esc(s.name || "")}" placeholder="Network name"><button class="btn del" data-act="rmshare">Remove</button></div>
+    <div class="g2"><div class="fld"><label>Host name (from the network)</label><input data-k="host" value="${esc(s.host || "")}" placeholder="e.g. given by VesselTracker"></div>
+      <div class="fld"><label>Port</label><input data-k="port" type="number" min="1" max="65535" value="${esc(s.port || "")}"></div>
+      <div class="fld"><label>Protocol</label><select data-k="protocol">${opt("udp", "UDP (most networks)", s.protocol || "udp")}${opt("tcp", "TCP", s.protocol || "udp")}</select></div></div></div>`;
 }
-
+function readRx() {
+  return [...document.querySelectorAll(".rxcard")].map(c => { const g = k => c.querySelector(`[data-k="${k}"]`);
+    const r = {name: g("name").value.trim(), enabled: g("enabled").checked, rig: g("rig").value, port: g("port").value, baud: +g("baud").value,
+      civ_address: g("civ_address").value.trim(), audio_device: g("audio_device").value, audio_channel: +g("audio_channel").value,
+      channel: g("channel").value, scan_seconds: Math.max(1, +g("scan_minutes").value || 10) * 60};
+    if (r.rig === "manual") { delete r.port; delete r.baud; delete r.civ_address; } return r; });
+}
+function readShare() {
+  return [...document.querySelectorAll(".shcard")].map(c => { const g = k => c.querySelector(`[data-k="${k}"]`);
+    return {name: g("name").value.trim(), enabled: g("enabled").checked, host: g("host").value.trim(), port: g("port").value, protocol: g("protocol").value}; });
+}
 function renderSettings() {
   $("#cfgPath").textContent = (S.demo ? "Demo mode: changes are saved for your next normal start. " : "") + (S.config_path ? "File: " + S.config_path : "");
-  $("#sName").value = S.station.name || ""; $("#sLat").value = S.station.lat ?? ""; $("#sLon").value = S.station.lon ?? "";
-  $("#rxForms").innerHTML = S.receivers.length ? S.receivers.map(rxForm).join("") : `<div class="hint">No receivers yet. Click “Add receiver”.</div>`;
-  if (!S.ports.length) $("#rxForms").insertAdjacentHTML("afterbegin", `<div class="hint" style="margin-bottom:8px">No COM ports found. Plug in the radio's USB cable and click ↻ Refresh.</div>`);
+  $("#sName").value = S.station.name || ""; $("#sCall").value = S.station.callsign || ""; $("#sLat").value = S.station.lat ?? ""; $("#sLon").value = S.station.lon ?? "";
+  $("#rxForms").innerHTML = (S.ports.length ? "" : `<div class="hint" style="margin-bottom:8px">No COM ports found. Plug in the radio's USB cable and click ↻ Refresh.</div>`)
+    + (S.receivers.length ? S.receivers.map(rxForm).join("") : `<div class="hint">No receivers yet.</div>`);
+  $("#shareForms").innerHTML = (S.share || []).map(shareForm).join("");
 }
-
-async function loadSettings(keepEdits) {
-  const edits = keepEdits && S ? readForms() : null;
+async function loadSettings(keep) {
+  const r = keep && S ? readRx() : null, sh = keep && S ? readShare() : null;
   S = await (await fetch("/api/settings", {cache: "no-store"})).json();
-  if (edits) S.receivers = edits;
+  if (r) { S.receivers = r; S.share = sh; }
   renderSettings();
 }
-
 $("#openSettings").onclick = async () => { await loadSettings(false); $("#settings").style.display = "block"; $("#saveMsg").className = "msg"; };
 $("#closeSettings").onclick = () => $("#settings").style.display = "none";
 $("#refreshLists").onclick = () => loadSettings(true);
-$("#addRx").onclick = () => { S.receivers = readForms(); S.receivers.push({name: `Receiver ${S.receivers.length + 1}`, enabled: true, rig: "icom", baud: 19200, civ_address: "0x7C", channel: "A", scan_seconds: 600}); renderSettings(); };
-$("#rxForms").addEventListener("change", e => { if (["rig", "channel"].includes(e.target.dataset.k)) { S.receivers = readForms();
+$("#addRx").onclick = () => { S.receivers = readRx(); S.share = readShare();
+  S.receivers.push({name: `Receiver ${S.receivers.length + 1}`, enabled: true, rig: "icom", baud: 19200, civ_address: "0x7C", channel: "A", scan_seconds: 600}); renderSettings(); };
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => { S.receivers = readRx(); S.share = readShare();
+  S.share.push({name: b.dataset.preset, enabled: true, host: "", port: "", protocol: "udp"}); renderSettings(); });
+$("#rxForms").addEventListener("change", e => { if (["rig", "channel"].includes(e.target.dataset.k)) { S.receivers = readRx(); S.share = readShare();
   const i = +e.target.closest(".rxcard").dataset.i; if (e.target.dataset.k === "rig") S.receivers[i].baud = DEF_BAUD[S.receivers[i].rig] || 19200; renderSettings(); } });
-$("#rxForms").addEventListener("click", async e => {
+$("#settings").addEventListener("click", async e => {
   const b = e.target.closest("button[data-act]"); if (!b) return;
-  const card = b.closest(".rxcard"), i = +card.dataset.i, rs = readForms(), m = card.querySelector("[data-msg]");
-  if (b.dataset.act === "remove") { rs.splice(i, 1); S.receivers = rs; renderSettings(); return; }
+  const rs = readRx(), sh = readShare();
+  if (b.dataset.act === "rmshare") { sh.splice(+b.closest(".shcard").dataset.i, 1); S.receivers = rs; S.share = sh; renderSettings(); return; }
+  const c = b.closest(".rxcard"), i = +c.dataset.i, m = c.querySelector("[data-msg]");
+  if (b.dataset.act === "remove") { rs.splice(i, 1); S.receivers = rs; S.share = sh; renderSettings(); return; }
   m.className = "msg ok"; m.textContent = "Testing… the radio should change frequency now.";
-  const j = await (await fetch("/api/test_cat", {method: "POST", headers: {"X-AIS": "1", "Content-Type": "application/json"}, body: JSON.stringify(rs[i])})).json();
+  const j = await post("/api/test_cat", rs[i]);
   m.className = "msg " + (j.ok ? "ok" : "bad"); m.textContent = j.ok ? "✓ " + j.status : "✗ " + (j.error || j.status);
 });
 $("#saveSettings").onclick = async () => {
-  const body = {station: {name: $("#sName").value, lat: $("#sLat").value, lon: $("#sLon").value}, receivers: readForms()};
-  const j = await (await fetch("/api/settings", {method: "POST", headers: {"X-AIS": "1", "Content-Type": "application/json"}, body: JSON.stringify(body)})).json();
+  const j = await post("/api/settings", {station: {name: $("#sName").value, callsign: $("#sCall").value, lat: $("#sLat").value, lon: $("#sLon").value},
+    receivers: readRx(), share: readShare()});
   $("#saveMsg").className = "msg " + (j.ok ? "ok" : "bad"); $("#saveMsg").textContent = j.ok ? "✓ " + j.message : "✗ " + j.error;
   if (j.ok) poll();
 };
 
 async function poll() {
-  try {
-    const s = await (await fetch("/api/state", {cache: "no-store"})).json();
-    if (!centred) { initMap(s.station); centred = true; }
-    last = s; render(s);
-  } catch (e) { $("#sUp").textContent = "offline"; }
+  try { const s = await (await fetch("/api/state", {cache: "no-store"})).json();
+    if (!inited) { initMap(s.station); inited = true; } last = s; render(s); }
+  catch (e) { $("#kV").textContent = "--"; }
 }
 poll(); setInterval(poll, 2000);
 </script>

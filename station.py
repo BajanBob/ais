@@ -16,7 +16,7 @@ import synth
 from ais import NmeaAssembler, Tracker, decode, to_nmea
 from cat import CHANNELS, Rig, make_rig
 from demod import AisDemod
-from io_ports import AudioInput, NmeaOutput, NmeaSerialInput, NmeaUdpInput, WavInput
+from io_ports import AudioInput, Feed, NmeaOutput, NmeaSerialInput, NmeaUdpInput, WavInput
 
 
 class Receiver:
@@ -97,6 +97,26 @@ class Station:
         self.started = time.time()
         self.rate: deque = deque(maxlen=600)
         self.config_path: str | None = None
+        self.callsign = st.get("callsign", "")
+        self.feeds: list[Feed] = []
+        self._start_feeds()
+
+    def _start_feeds(self) -> None:
+        for f in self.feeds:
+            f.close()
+        self.feeds = []
+        if self.cfg.get("_demo"):
+            return  # never send simulated ships to real networks
+        for s in self.cfg.get("share", []):
+            if s.get("enabled", True) and s.get("host") and s.get("port"):
+                try:
+                    self.feeds.append(Feed(s.get("name") or s["host"], s["host"], int(s["port"]), s.get("protocol", "udp")))
+                except (ValueError, OSError) as e:
+                    print(f"Sharing {s.get('name')}: {e}")
+
+    def _share(self, sentences) -> None:
+        for f in self.feeds:
+            f.send(sentences)
 
     # -------------------------------------------------- inputs
     def add_audio_receiver(self, rcfg: dict) -> Receiver:
@@ -120,8 +140,9 @@ class Station:
         from io_ports import list_audio_inputs, list_serial_ports
         st = self.cfg.get("station", {})
         rx = [{k: r.get(k) for k in self.EDITABLE if k in r} for r in self.cfg.get("receivers", [])]
-        return {"station": {"name": st.get("name", ""), "lat": st.get("lat"), "lon": st.get("lon")},
-                "receivers": rx, "ports": list_serial_ports(), "audio": list_audio_inputs(),
+        share = [{k: s.get(k) for k in ("name", "enabled", "host", "port", "protocol")} for s in self.cfg.get("share", [])]
+        return {"station": {"name": st.get("name", ""), "callsign": st.get("callsign", ""), "lat": st.get("lat"), "lon": st.get("lon")},
+                "receivers": rx, "share": share, "ports": list_serial_ports(), "audio": list_audio_inputs(),
                 "config_path": str(Path(self.config_path).resolve()) if self.config_path else None,
                 "demo": bool(self.cfg.get("_demo"))}
 
@@ -177,8 +198,20 @@ class Station:
                 base.pop(k, None)
             base.update(r)
             merged.append(base)
-        saved.setdefault("station", {}).update({"name": str(stn.get("name") or "AIS station")[:60], "lat": lat, "lon": lon})
+        share = []
+        for s in new.get("share", []):
+            host, port = str(s.get("host") or "").strip(), s.get("port")
+            if not host and not port:
+                continue
+            if not host or not str(port).isdigit() or not 0 < int(port) < 65536:
+                raise ValueError(f"Sharing '{s.get('name') or host}': enter the host name and port the network gave you")
+            proto = str(s.get("protocol") or "udp").lower()
+            share.append({"name": str(s.get("name") or host)[:40], "enabled": bool(s.get("enabled", True)),
+                          "host": host[:200], "port": int(port), "protocol": "tcp" if proto == "tcp" else "udp"})
+        saved.setdefault("station", {}).update({"name": str(stn.get("name") or "AIS station")[:60],
+                                                "callsign": str(stn.get("callsign") or "")[:12].upper(), "lat": lat, "lon": lon})
         saved["receivers"] = merged
+        saved["share"] = share
         tmp = p.with_suffix(".tmp")
         tmp.write_text(json.dumps(saved, indent=2), encoding="utf-8")
         tmp.replace(p)
@@ -190,6 +223,9 @@ class Station:
         self.receivers = []
         self.cfg["receivers"] = merged
         self.cfg["station"] = saved["station"]
+        self.cfg["share"] = share
+        self._start_feeds()
+        self.callsign = saved["station"]["callsign"]
         self.name, self.lat, self.lon = saved["station"]["name"], lat, lon
         self.tracker.lat, self.tracker.lon = lat, lon
         for r in merged:
@@ -229,6 +265,7 @@ class Station:
     def on_bits(self, bits, source: str, channel: str) -> None:
         sentences = to_nmea(bits, channel)
         self.out.send(sentences)
+        self._share(sentences)
         self._handle(bits, source, channel, sentences)
 
     def on_nmea(self, line: str, source: str) -> None:
@@ -237,6 +274,8 @@ class Station:
             return
         bits, chan, own = res
         self.out.send([line.strip()])
+        if not own:
+            self._share([line.strip()])
         self._handle(bits, source + (" (own)" if own else ""), chan, [line.strip()])
 
     def _handle(self, bits, source, channel, sentences) -> None:
@@ -259,8 +298,9 @@ class Station:
         with self.lock:
             log = list(self.log)[-40:]
         return {
-            "station": {"name": self.name, "lat": self.lat, "lon": self.lon},
+            "station": {"name": self.name, "callsign": self.callsign, "lat": self.lat, "lon": self.lon},
             "receivers": [r.status() for r in self.receivers],
+            "feeds": [f.status() for f in self.feeds],
             "inputs": self.inputs,
             "vessels": self.tracker.snapshot(),
             "stats": {"messages": self.tracker.total, "per_min": sum(1 for t in self.rate if now - t < 60),

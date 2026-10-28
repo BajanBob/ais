@@ -1,0 +1,9 @@
+
+  First run: created /home/claude/ais/config.json
+  Open it in Notepad and set your radios' COM ports, audio device and station position,
+  then start AIS Station again. Starting the DEMO now so you can see how it works.
+
+
+  AIS station running (receive-only). Display: http://127.0.0.1:8150/
+  Press Ctrl+C to stop.
+

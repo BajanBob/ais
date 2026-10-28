@@ -106,7 +106,7 @@ def main() -> int:
             print("  then start AIS Station again. Starting the DEMO now so you can see how it works.\n")
             args.demo = True
     if args.demo:
-        cfg = {"station": {"name": "DEMO STATION", "lat": 13.0975, "lon": -59.6167},
+        cfg = {"station": {"name": "OCEAN CITY RADIO (DEMO)", "callsign": "8PFX", "lat": 13.0975, "lon": -59.6167},
                "receivers": [], "nmea_udp": [], "nmea_tcp_port": None, "_demo": True}
     elif args.wav:
         cfg = {"station": {"name": "WAV FILE"}, "nmea_udp": [], "nmea_tcp_port": None}
