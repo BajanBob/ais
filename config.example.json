@@ -1,0 +1,54 @@
+{
+  "station": {
+    "name": "8PFX AIS MONITOR",
+    "lat": 13.0975,
+    "lon": -59.6167
+  },
+
+  "receivers": [
+    {
+      "name": "IC-9100",
+      "enabled": true,
+      "rig": "icom",
+      "port": "COM5",
+      "baud": 19200,
+      "civ_address": "0x7C",
+      "audio_device": "USB Audio CODEC",
+      "audio_channel": 0,
+      "sample_rate": 48000,
+      "channel": "A"
+    },
+    {
+      "name": "FT-991A",
+      "enabled": true,
+      "rig": "yaesu",
+      "port": "COM7",
+      "baud": 38400,
+      "stopbits": 1,
+      "audio_device": "USB Audio CODEC",
+      "audio_channel": 0,
+      "sample_rate": 48000,
+      "channel": "B"
+    },
+    {
+      "name": "FTM-510DR",
+      "enabled": false,
+      "rig": "manual",
+      "audio_device": "Line In",
+      "audio_channel": 0,
+      "sample_rate": 48000,
+      "channel": "A"
+    }
+  ],
+
+  "nmea_in_udp": [],
+  "nmea_in_serial": [],
+
+  "nmea_udp": ["127.0.0.1:10110"],
+  "nmea_tcp_port": 10110,
+  "log_file": "ais-log.nmea",
+
+  "web_port": 8100,
+  "web_lan": false,
+  "vessel_timeout_min": 60
+}

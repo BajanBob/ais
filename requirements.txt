@@ -1,0 +1,4 @@
+numpy>=1.24
+scipy>=1.10
+sounddevice>=0.4    # audio input from the radio
+pyserial>=3.5       # CAT control and NMEA serial input
