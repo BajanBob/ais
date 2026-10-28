@@ -6,3 +6,4 @@ dist/
 config.json
 *.nmea
 .venv/
+crash.log

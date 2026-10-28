@@ -41,15 +41,20 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          pyinstaller --noconfirm --onefile --name AIS-Station \
+          # A program folder (not one packed .exe): starts faster and antivirus flags it far less often.
+          pyinstaller --noconfirm --onedir --name AIS-Station \
             --add-data "web${{ matrix.sep }}web" \
             --add-data "config.example.json${{ matrix.sep }}." aisrx.py
+      - name: Self-test the built program
+        shell: bash
+        run: ./dist/AIS-Station/AIS-Station --selftest
       - name: Package
         shell: bash
         run: |
-          cp README.md LICENSE config.example.json dist/
+          cp README.md LICENSE config.example.json dist/AIS-Station/
+          if [ "${{ matrix.target }}" = "windows" ]; then cp windows/*.bat dist/AIS-Station/; fi
           cd dist
-          if [ "${{ matrix.target }}" = "windows" ]; then 7z a ../AIS-Station-windows.zip .; else zip -r ../AIS-Station-${{ matrix.target }}.zip .; fi
+          if [ "${{ matrix.target }}" = "windows" ]; then 7z a -tzip ../AIS-Station-windows.zip AIS-Station; else zip -r -y ../AIS-Station-${{ matrix.target }}.zip AIS-Station; fi
       - uses: actions/upload-artifact@v4
         with:
           name: AIS-Station-${{ matrix.target }}
