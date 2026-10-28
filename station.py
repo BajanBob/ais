@@ -169,11 +169,14 @@ class DemoTraffic:
         self.rx, self.rng = rx, np.random.default_rng()
         self.ships = []
         for i, (name, call, st, dest) in enumerate(self.NAMES):
-            ang = random.uniform(0, 2 * math.pi)
-            r = random.uniform(2, 18) / 60
+            # Demo ships start out at sea west of the station (Bridgetown is on the west coast)
+            # and sail roughly north or south, parallel to the coast, so they stay off the island.
+            ang = math.radians(random.uniform(215, 325))
+            r = random.uniform(4, 18) / 60
+            cog = random.choice((random.uniform(170, 190), random.uniform(350, 370) % 360))
             self.ships.append({"mmsi": (377 if st != 37 and st != 30 else 314) * 1000000 + 100 + i,
                                "lat": lat + r * math.cos(ang), "lon": lon + r * math.sin(ang),
-                               "sog": random.uniform(4, 16) if st != 30 else 3.0, "cog": random.uniform(0, 360),
+                               "sog": random.uniform(4, 16) if st != 30 else 3.0, "cog": cog,
                                "name": name, "call": call, "type": st, "dest": dest,
                                "classB": st in (30, 37)})
         self.base = (3140001, lat, lon)
@@ -187,7 +190,7 @@ class DemoTraffic:
                 dt = 2 / 3600
                 s["lat"] += s["sog"] * dt / 60 * math.cos(math.radians(s["cog"]))
                 s["lon"] += s["sog"] * dt / 60 * math.sin(math.radians(s["cog"])) / math.cos(math.radians(s["lat"]))
-                s["cog"] = (s["cog"] + random.uniform(-2, 2)) % 360
+                s["cog"] = (s["cog"] + random.uniform(-0.5, 0.5)) % 360
                 if random.random() < 0.6:
                     f = synth.type18 if s["classB"] else synth.type1
                     msgs.append(f(s["mmsi"], s["lat"], s["lon"], s["sog"], s["cog"], int(s["cog"])))
