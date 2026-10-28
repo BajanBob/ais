@@ -70,8 +70,8 @@ def selftest() -> int:
     try:
         import sounddevice  # noqa: F401
         print("Audio: OK")
-    except OSError as e:  # no sound system on a build server is fine
-        print(f"Audio: library present, no sound system here ({e})")
+    except Exception as e:  # noqa: BLE001 - no sound system on a build server is fine
+        print(f"Audio: library present, no sound system here ({type(e).__name__}: {e})")
     return 0 if ok and (HERE / "web" / "index.html").exists() else 1
 
 

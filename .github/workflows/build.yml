@@ -47,7 +47,12 @@ jobs:
             --add-data "config.example.json${{ matrix.sep }}." aisrx.py
       - name: Self-test the built program
         shell: bash
-        run: ./dist/AIS-Station/AIS-Station --selftest
+        run: |
+          set +e
+          ./dist/AIS-Station/AIS-Station --selftest > selftest.txt 2>&1
+          rc=$?
+          while IFS= read -r line; do echo "::notice title=Self-test ${{ matrix.target }}::$line"; done < selftest.txt
+          exit $rc
       - name: Package
         shell: bash
         run: |
