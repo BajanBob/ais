@@ -1,0 +1,60 @@
+name: Build AIS Station
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy scipy
+      - run: python tests/test_pipeline.py
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: windows, sep: ";" }
+          - { os: macos-latest, target: macos, sep: ":" }
+          - { os: ubuntu-latest, target: linux, sep: ":" }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+      - run: pip install -r requirements.txt pyinstaller
+      - name: Build
+        shell: bash
+        run: |
+          pyinstaller --noconfirm --onefile --name AIS-Station \
+            --add-data "web${{ matrix.sep }}web" \
+            --add-data "config.example.json${{ matrix.sep }}." aisrx.py
+      - name: Package
+        shell: bash
+        run: |
+          cp README.md LICENSE config.example.json dist/
+          cd dist
+          if [ "${{ matrix.target }}" = "windows" ]; then 7z a ../AIS-Station-windows.zip .; else zip -r ../AIS-Station-${{ matrix.target }}.zip .; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AIS-Station-${{ matrix.target }}
+          path: AIS-Station-${{ matrix.target }}.zip
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: AIS-Station-${{ matrix.target }}.zip
